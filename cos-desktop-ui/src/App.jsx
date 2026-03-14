@@ -1,7 +1,6 @@
-import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
+import { Routes, Route, NavLink, useLocation, Navigate } from 'react-router-dom'
 import Landing from './pages/Landing'
 import Auth from './pages/Auth'
-import Home from './pages/Home'
 import AskMemory from './pages/AskMemory'
 import Timeline from './pages/Timeline'
 import FocusMode from './pages/FocusMode'
@@ -11,6 +10,17 @@ import TabGuardian from './components/TabGuardian'
 import SystemGuardian from './components/SystemGuardian'
 import StoragePaywall from './components/StoragePaywall'
 import { HomeIcon, MicIcon, TimelineIcon, FocusIcon } from './components/Icons'
+
+import { useMode } from './context/ModeContext'
+import ModeSelector from './pages/ModeSelector'
+
+// Mode-specific home pages
+import ProfessionalHome from './pages/modes/ProfessionalHome'
+import StudentHome      from './pages/modes/StudentHome'
+import ParentHome       from './pages/modes/ParentHome'
+import ChildHome        from './pages/modes/ChildHome'
+import SeniorHome       from './pages/modes/SeniorHome'
+import EmployeeHome     from './pages/modes/EmployeeHome'
 
 const NAV = [
   { to: '/home',      Icon: HomeIcon,     label: 'Home' },
@@ -22,10 +32,29 @@ const NAV = [
 
 export default function App() {
   const location = useLocation()
+  const { mode, currentMode } = useMode()
+  
   const isLandingOrAuth = location.pathname === '/' || location.pathname === '/auth'
 
+  // Global mode selector block logic
+  if (!isLandingOrAuth && !mode && location.pathname !== '/mode-select') {
+    return <ModeSelector />
+  }
+
+  // Define active color palette or fallback
+  const c = currentMode ? currentMode.colors : null
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: "'Outfit', sans-serif" }}>
+    <div style={{ 
+      minHeight: '100vh', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      fontFamily: "'Outfit', sans-serif",
+      background: c ? c.bg : undefined,
+      color: c ? c.text : undefined,
+      transition: 'all 0.3s ease',
+      fontSize: currentMode?.features.largeText ? '18px' : '14px'
+    }}>
 
       {/* Main content */}
       <main style={isLandingOrAuth ? {} : {
@@ -35,7 +64,20 @@ export default function App() {
         <Routes>
           <Route path="/"         element={<Landing />} />
           <Route path="/auth"     element={<Auth />} />
-          <Route path="/home"     element={<Home />} />
+          
+          <Route path="/mode-select" element={<ModeSelector />} />
+
+          {/* Mode-specific home */}
+          <Route path="/home" element={
+            mode === 'professional' ? <ProfessionalHome /> :
+            mode === 'student'      ? <StudentHome />      :
+            mode === 'parent'       ? <ParentHome />       :
+            mode === 'child'        ? <ChildHome />        :
+            mode === 'senior'       ? <SeniorHome />       :
+            mode === 'employee'     ? <EmployeeHome />     :
+            <Navigate to="/mode-select" replace />
+          }/>
+
           <Route path="/ask"      element={<AskMemory />} />
           <Route path="/timeline" element={<Timeline />} />
           <Route path="/focus"    element={<FocusMode />} />
@@ -44,8 +86,8 @@ export default function App() {
       </main>
 
       {/* Overlay recall — only in app */}
-      {!isLandingOrAuth && <OverlayRecall />}
-      <TabGuardian />
+      {!isLandingOrAuth && <OverlayRecall mode={mode} colors={c} />}
+      <TabGuardian mode={mode} colors={c} />
       <SystemGuardian />
       <StoragePaywall />
 

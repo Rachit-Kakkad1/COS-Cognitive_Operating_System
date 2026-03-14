@@ -31,6 +31,7 @@ from database import insert_memory, get_all_memories, get_memories_by_app, get_m
 from vector_store import vector_store
 from recall_engine import recall
 from worksense import worksense_router, verify_token
+from student import student_router
 
 # Lazy import to avoid loading model at import time if not needed
 _pipeline = None
@@ -73,8 +74,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ─── WorkSense API ───────────────────────────────────────────────────────
+# ─── WorkSense & Student APIs ────────────────────────────────────────────
 app.include_router(worksense_router)
+app.include_router(student_router)
 
 
 # ─── Request logging middleware ──────────────────────────────────────────
@@ -461,6 +463,161 @@ async def storage_clear(
     return { "status": "cleared",
              "message": "All memories deleted — fresh start" }
 
+# ─── Mode API ────────────────────────────────────────────────────────────
+
+MODE_LANGUAGE = {
+  'professional': {
+    'recall_prefix':  "You were working on",
+    'return_prompt':  "Would you like to resume?",
+    'focus_good':     "Deep focus session detected",
+    'focus_bad':      "High context switching detected",
+  },
+  'student': {
+    'recall_prefix':  "You were studying",
+    'return_prompt':  "Want to get back to studying?",
+    'focus_good':     "Great study session! 🎉",
+    'focus_bad':      "Lots of distractions today 😅",
+  },
+  'child': {
+    'recall_prefix':  "You were learning about",
+    'return_prompt':  "Want to go back to learning? 📚",
+    'focus_good':     "Amazing focus! You're a superstar! ⭐",
+    'focus_bad':      "Oops! Let's get back on track! 💪",
+  },
+  'senior': {
+    'recall_prefix':  "You were reading",
+    'return_prompt':  "Would you like to go back to that?",
+    'focus_good':     "You had a good session today",
+    'focus_bad':      "You switched between things a few times",
+  },
+  'employee': {
+    'recall_prefix':  "You were working on",
+    'return_prompt':  "Jump back in? 💪",
+    'focus_good':     "Outstanding focus — you're crushing it 🔥",
+    'focus_bad':      "Multiple context switches — try time-blocking",
+  },
+  'parent': {
+    'recall_prefix':  "Your child was on",
+    'return_prompt':  "Check in?",
+    'focus_good':     "Good study session",
+    'focus_bad':      "High distraction detected",
+  },
+}
+
+@app.get("/mode/recall")
+async def mode_aware_recall(
+    query:  str = "",
+    mode:   str = "professional",
+    k:      int = 5
+):
+    """
+    Mode-aware recall — same engine, different language.
+    Returns results with mode-specific messaging.
+    """
+    results = recall(query, k)
+    lang    = MODE_LANGUAGE.get(mode, MODE_LANGUAGE['professional'])
+
+    # Adapt language of results
+    if isinstance(results, dict) and 'results' in results:
+        for r in results.get('results', []):
+            r['message'] = f"{lang['recall_prefix']} {r.get('summary','')}"
+            r['cta']     = lang['return_prompt']
+            
+        results['mode']     = mode
+        results['language'] = lang
+
+    return results
+
+@app.post("/mode/save")
+async def save_user_mode(request: Request):
+    """Saves user mode selection to SQLite."""
+    data = await request.json()
+    mode = data.get('mode')
+    conn = _get_conn()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
+    conn.execute(
+        "INSERT OR REPLACE INTO user_settings VALUES (?,?)",
+        ('user_mode', mode)
+    )
+    conn.commit()
+    conn.close()
+    return {"status": "saved", "mode": mode}
+
+@app.get("/mode/coach-tip")
+async def coach_tip(mode: str = "employee"):
+    """
+    Returns a personalized coaching tip based on
+    the user's actual behavior patterns from last 7 days.
+    """
+    conn = _get_conn()
+
+    # Get last 7 days of snapshots
+    snapshots = conn.execute("""
+        SELECT app, focus_score, context_switches,
+               session_minutes, timestamp
+        FROM employee_snapshots
+        WHERE timestamp >= datetime('now', '-7 days')
+        ORDER BY timestamp
+    """).fetchall()
+    conn.close()
+
+    if not snapshots:
+        tips = {
+            'professional': "Start your day with your hardest task — your brain is freshest in the morning.",
+            'student':      "Try the Pomodoro technique — 25 min study, 5 min break.",
+            'employee':     "Block your top 2 hours for deep work — no meetings, no Slack.",
+            'child':        "Great job starting! Try to study for 20 minutes without stopping! 🌟",
+            'senior':       "Take it one step at a time. You're doing wonderfully.",
+            'parent':       "Set consistent screen time limits — consistency is key.",
+        }
+        return {"tip": tips.get(mode, tips['professional']), "based_on": "default"}
+
+    # Analyze patterns
+    avg_focus    = sum(s['focus_score'] for s in snapshots) / len(snapshots)
+    avg_switches = sum(s['context_switches'] for s in snapshots) / len(snapshots)
+
+    # Find peak hour
+    from collections import defaultdict
+    hour_scores  = defaultdict(list)
+    for s in snapshots:
+        try:
+            hour = int(s['timestamp'][11:13])
+            hour_scores[hour].append(s['focus_score'])
+        except: pass
+
+    peak_hour = max(
+        hour_scores.items(),
+        key=lambda x: sum(x[1])/len(x[1])
+    )[0] if hour_scores else 10
+
+    peak_label = (
+        f"{peak_hour}am" if peak_hour < 12
+        else f"{peak_hour-12}pm" if peak_hour > 12
+        else "12pm"
+    )
+
+    # Generate tip
+    if avg_switches > 15:
+        tip = f"You switch context {avg_switches:.0f} times a day on average. Try 90-minute focus blocks with phone in another room."
+    elif avg_focus < 60:
+        tip = f"Your peak focus is at {peak_label}. Protect that time — no meetings, no Slack."
+    elif avg_focus >= 80:
+        tip = f"You're performing at {avg_focus:.0f}/100 — exceptional. Keep protecting your {peak_label} deep work window."
+    else:
+        tip = f"Your best focus window is {peak_label}. Schedule your most important work there every day."
+
+    return {
+        "tip":        tip,
+        "based_on":   "behavior_patterns",
+        "peak_hour":  peak_label,
+        "avg_focus":  round(avg_focus),
+        "avg_switches": round(avg_switches)
+    }
 
 if __name__ == "__main__":
     import uvicorn

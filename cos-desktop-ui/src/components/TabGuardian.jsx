@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useMode } from '../context/ModeContext'
 
 /* ────────────────────────────────────────────────────────────────────────
    COS — Cognitive Tab Guardian
@@ -12,6 +13,8 @@ const TabGuardian = () => {
   const [countdown, setCountdown] = useState(8)
   const [context, setContext] = useState(null)
   const [switchId, setSwitchId] = useState(null)
+  
+  const { currentMode } = useMode()
 
   // Read employee token from localStorage (set during employee auth)
   const empToken = localStorage.getItem('cos_emp_token') || ''
@@ -123,34 +126,50 @@ const TabGuardian = () => {
   // ─── Render ───────────────────────────────────────────────────────
   if (!visible || !context) return null
 
+  // Check feature flag for TabGuardian
+  if (currentMode && currentMode.features.tabGuardian === false) return null
+
+  const isChild = currentMode?.id === 'child'
+  const isStudent = currentMode?.id === 'student'
+  const isEmployee = currentMode?.id === 'employee'
+  
+  const c = currentMode?.colors || {
+    primary: '#6366f1', surface: '#1a1a1a', border: '#6366f1', text: '#ffffff', textMuted: '#a1a1aa', bg: '#0f0f0f', accent: '#f59e0b'
+  }
+
+  const titleMsg = isChild ? "Hey! You were learning! 📚" : (isStudent ? "Study Context Alert" : "🧠 COS — Context Alert")
+  const prevContextMsg = isChild ? "You were learning about:" : (isStudent ? "You were studying:" : "You were working on:")
+  const questionMsg = isChild ? "Want to go back to learning? 📚" : (isStudent ? "Want to get back to studying? 🚀" : (isEmployee ? "Jump back in? 💪" : "Would you like to go back?"))
+  const yesBtn = isChild ? "Yes! Back to learning! 🚀" : (isStudent ? "Yes, back to study" : "↩ Take me back")
+
   return (
     <div style={{
       position: 'fixed',
       bottom: '24px',
       right: '24px',
       width: '380px',
-      background: '#1a1a1a',
-      border: '1px solid #6366f1',
-      borderRadius: '12px',
-      padding: '20px',
+      background: c.surface,
+      border: `2px solid ${c.primary}`,
+      borderRadius: '16px',
+      padding: '24px',
       zIndex: 9999,
       animation: 'cosSlideUp 0.3s ease-out',
-      boxShadow: '0 0 24px rgba(99,102,241,0.15), 0 8px 32px rgba(0,0,0,0.4)',
+      boxShadow: `0 0 24px ${c.primary}30, 0 8px 32px rgba(0,0,0,0.4)`,
       fontFamily: "'Outfit', sans-serif",
     }}>
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <span style={{ color: '#6366f1', fontWeight: 600, fontSize: '14px' }}>
-          🧠 COS — Context Alert
+        <span style={{ color: c.primary, fontWeight: 700, fontSize: '15px' }}>
+          {titleMsg}
         </span>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <span style={{ color: '#a1a1aa', fontSize: '12px' }}>{countdown}s</span>
+          <span style={{ color: c.textMuted, fontSize: '13px', fontWeight: 600 }}>{countdown}s</span>
           <button
             onClick={() => setVisible(false)}
             style={{
               background: 'none', border: 'none',
-              color: '#a1a1aa', cursor: 'pointer', fontSize: '16px',
+              color: c.textMuted, cursor: 'pointer', fontSize: '18px',
               padding: 0, lineHeight: 1,
             }}
           >
@@ -160,70 +179,68 @@ const TabGuardian = () => {
       </div>
 
       {/* Context info */}
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ color: '#a1a1aa', fontSize: '12px', marginBottom: '6px' }}>
-          You were working on:
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ color: c.textMuted, fontSize: '13px', marginBottom: '8px', fontWeight: 500 }}>
+          {prevContextMsg}
         </div>
         <div style={{
-          color: '#ffffff', fontSize: '15px',
-          fontWeight: 600, marginBottom: '8px',
+          color: c.text, fontSize: '16px',
+          fontWeight: 600, marginBottom: '12px',
+          padding: '12px', background: c.bg, borderRadius: '8px', border: `1px solid ${c.border}`,
           overflow: 'hidden', textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
         }}>
           "{context.title}"
         </div>
-        <div style={{ display: 'flex', gap: '16px' }}>
-          <span style={{ color: '#6366f1', fontSize: '12px' }}>
-            {context.app}
-          </span>
-          <span style={{ color: '#a1a1aa', fontSize: '12px' }}>
-            {context.session_minutes}m
-          </span>
-          <span style={{ color: '#14b8a6', fontSize: '12px' }}>
-            Focus: {context.focus_score}/100
-          </span>
-        </div>
+        
+        {!isChild && (
+           <div style={{ display: 'flex', gap: '16px' }}>
+             <span style={{ color: c.primary, fontSize: '13px', fontWeight: 600 }}>
+               {context.app}
+             </span>
+             <span style={{ color: c.textMuted, fontSize: '13px' }}>
+               {context.session_minutes}m
+             </span>
+             <span style={{ color: c.accent, fontSize: '13px', fontWeight: 600 }}>
+               Focus: {context.focus_score}/100
+             </span>
+           </div>
+        )}
       </div>
 
       {/* Question */}
-      <div style={{ color: '#ffffff', fontSize: '14px', marginBottom: '16px' }}>
-        Would you like to go back?
+      <div style={{ color: c.text, fontSize: '15px', marginBottom: '16px', fontWeight: 600 }}>
+        {questionMsg}
       </div>
 
       {/* Buttons */}
-      <div style={{ display: 'flex', gap: '8px' }}>
+      <div style={{ display: 'flex', gap: '10px' }}>
         <button onClick={handleTakeMeBack} style={{
-          flex: 1, padding: '10px', background: '#6366f1',
-          color: '#fff', border: 'none', borderRadius: '8px',
-          cursor: 'pointer', fontSize: '13px', fontWeight: 500,
+          flex: 1, padding: '12px', background: c.primary,
+          color: '#fff', border: 'none', borderRadius: '10px',
+          cursor: 'pointer', fontSize: '14px', fontWeight: 600,
           transition: 'background 0.2s',
         }}
-          onMouseEnter={e => e.currentTarget.style.background = '#4f46e5'}
-          onMouseLeave={e => e.currentTarget.style.background = '#6366f1'}
         >
-          ↩ Take me back
+          {yesBtn}
         </button>
 
         <button onClick={handleStayHere} style={{
-          flex: 1, padding: '10px', background: '#1a1a1a',
-          color: '#a1a1aa', border: '1px solid #2a2a2a',
-          borderRadius: '8px', cursor: 'pointer', fontSize: '13px',
+          flex: 1, padding: '12px', background: c.bg,
+          color: c.text, border: `1px solid ${c.border}`,
+          borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 500,
           transition: 'border-color 0.2s',
         }}
-          onMouseEnter={e => e.currentTarget.style.borderColor = '#6366f1'}
-          onMouseLeave={e => e.currentTarget.style.borderColor = '#2a2a2a'}
         >
           ✓ Stay here
         </button>
 
         <button onClick={handleSnooze} style={{
-          padding: '10px 12px', background: '#1a1a1a',
-          color: '#a1a1aa', border: '1px solid #2a2a2a',
-          borderRadius: '8px', cursor: 'pointer', fontSize: '13px',
+          padding: '12px 14px', background: c.bg,
+          color: c.text, border: `1px solid ${c.border}`,
+          borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 500,
           transition: 'border-color 0.2s',
         }}
-          onMouseEnter={e => e.currentTarget.style.borderColor = '#6366f1'}
-          onMouseLeave={e => e.currentTarget.style.borderColor = '#2a2a2a'}
         >
           ⏰ 5m
         </button>
