@@ -3,63 +3,94 @@ import { useState, useEffect } from 'react'
 const API = 'http://localhost:8000'
 
 export default function CognitiveGraph() {
-  const [graph, setGraph] = useState({ nodes: [], edges: [] })
+  const [graph, setGraph] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetch(`${API}/graph`)
       .then(r => r.json())
-      .then(data => setGraph(data))
-      .catch(() => {})
+      .then(data => { setGraph(data); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [])
 
-  if (graph.nodes.length === 0) {
-    return (
-      <div className="text-center text-zinc-600 py-8">
-        No graph data yet. Start capturing context.
-      </div>
-    )
-  }
+  if (loading) return (
+    <div style={{ textAlign: 'center', padding: 40, color: 'rgba(240,235,204,0.3)', fontSize: 13 }}>
+      Loading graph…
+    </div>
+  )
 
-  // Simple 2D visualization 
-  const WIDTH = 800, HEIGHT = 400
-  const nodePositions = {}
-  graph.nodes.forEach((n, i) => {
-    const angle = (2 * Math.PI * i) / graph.nodes.length
-    const r = Math.min(WIDTH, HEIGHT) * 0.35
-    nodePositions[n.id] = {
-      x: WIDTH / 2 + r * Math.cos(angle),
-      y: HEIGHT / 2 + r * Math.sin(angle),
-    }
+  if (!graph || graph.nodes?.length === 0) return (
+    <div style={{
+      background: 'rgba(4,0,154,0.12)', border: '1px solid rgba(62,219,240,0.1)',
+      borderRadius: 16, padding: '32px', textAlign: 'center',
+    }}>
+      <div style={{ fontSize: 32, marginBottom: 10 }}>🔗</div>
+      <p style={{ color: 'rgba(240,235,204,0.4)', fontSize: 13 }}>No memory graph yet</p>
+    </div>
+  )
+
+  const nodeCount = graph.nodes?.length || 0
+  const edgeCount = graph.edges?.length || 0
+
+  // Group nodes by app
+  const apps = {}
+  graph.nodes.forEach(n => {
+    const a = n.app || 'Unknown'
+    apps[a] = (apps[a] || 0) + 1
   })
 
   return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-zinc-200">🕸️ Cognitive Graph</h3>
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full h-auto bg-zinc-900/50 rounded-xl border border-zinc-800/40">
-        {/* Edges */}
-        {graph.edges.map((e, i) => {
-          const s = nodePositions[e.source]
-          const t = nodePositions[e.target]
-          if (!s || !t) return null
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Stats row */}
+      <div style={{ display: 'flex', gap: 10 }}>
+        {[
+          { label: 'Nodes', value: nodeCount, color: '#3EDBF0' },
+          { label: 'Edges', value: edgeCount, color: '#77ACF1' },
+          { label: 'Apps',  value: Object.keys(apps).length, color: '#F0EBCC' },
+        ].map(s => (
+          <div key={s.label} style={{
+            flex: 1, background: 'rgba(4,0,154,0.15)',
+            border: `1px solid ${s.color}22`,
+            borderRadius: 12, padding: '12px', textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 10, color: 'rgba(240,235,204,0.35)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              {s.label}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* App breakdown */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {Object.entries(apps).slice(0, 8).map(([app, count], i) => {
+          const pct = Math.round((count / nodeCount) * 100)
           return (
-            <line key={i} x1={s.x} y1={s.y} x2={t.x} y2={t.y}
-              stroke="rgba(139,92,246,0.3)" strokeWidth="1" />
+            <div key={app} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              animation: `fadeSlideUp 0.3s ease-out both`,
+              animationDelay: `${i * 0.05}s`,
+            }}>
+              <span style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: '#3EDBF0', flexShrink: 0,
+                boxShadow: '0 0 6px #3EDBF0',
+              }} />
+              <span style={{ color: 'var(--cream)', fontSize: 12, flex: 1, fontWeight: 500 }}>{app}</span>
+              <div style={{ width: 80, height: 3, background: 'rgba(119,172,241,0.12)', borderRadius: 2 }}>
+                <div style={{
+                  width: `${pct}%`, height: '100%',
+                  background: 'linear-gradient(90deg,#3EDBF0,#77ACF1)',
+                  borderRadius: 2,
+                }} />
+              </div>
+              <span style={{ color: 'rgba(240,235,204,0.35)', fontSize: 11, width: 28, textAlign: 'right' }}>
+                {count}
+              </span>
+            </div>
           )
         })}
-        {/* Nodes */}
-        {graph.nodes.map(n => {
-          const pos = nodePositions[n.id]
-          if (!pos) return null
-          return (
-            <g key={n.id}>
-              <circle cx={pos.x} cy={pos.y} r="8" fill="#8b5cf6" opacity="0.8" />
-              <text x={pos.x} y={pos.y - 14} textAnchor="middle" fill="#a1a1aa" fontSize="8">
-                {(n.summary || '').slice(0, 20)}
-              </text>
-            </g>
-          )
-        })}
-      </svg>
+      </div>
     </div>
   )
 }

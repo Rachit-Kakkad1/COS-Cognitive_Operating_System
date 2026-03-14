@@ -1,52 +1,110 @@
-import { Routes, Route, NavLink } from 'react-router-dom'
+import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
+import Landing from './pages/Landing'
+import Auth from './pages/Auth'
 import Home from './pages/Home'
 import AskMemory from './pages/AskMemory'
 import Timeline from './pages/Timeline'
 import FocusMode from './pages/FocusMode'
 import OverlayRecall from './components/OverlayRecall'
+import { HomeIcon, MicIcon, TimelineIcon, FocusIcon } from './components/Icons'
 
 const NAV = [
-  { to: '/', icon: '🧠', label: 'Home' },
-  { to: '/ask', icon: '🎙️', label: 'Ask' },
-  { to: '/timeline', icon: '📅', label: 'Timeline' },
-  { to: '/focus', icon: '🎯', label: 'Focus' },
+  { to: '/home',      Icon: HomeIcon,     label: 'Home' },
+  { to: '/ask',       Icon: MicIcon,      label: 'Ask' },
+  { to: '/timeline',  Icon: TimelineIcon, label: 'Timeline' },
+  { to: '/focus',     Icon: FocusIcon,    label: 'Focus' },
 ]
 
 export default function App() {
+  const location = useLocation()
+  const isLandingOrAuth = location.pathname === '/' || location.pathname === '/auth'
+
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-zinc-200 flex flex-col">
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: "'Outfit', sans-serif" }}>
+
       {/* Main content */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 pb-24 pt-6">
+      <main style={isLandingOrAuth ? {} : {
+        flex: 1, maxWidth: 860, width: '100%', margin: '0 auto',
+        padding: '0 20px 100px', paddingTop: 24,
+      }}>
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/ask" element={<AskMemory />} />
+          <Route path="/"         element={<Landing />} />
+          <Route path="/auth"     element={<Auth />} />
+          <Route path="/home"     element={<Home />} />
+          <Route path="/ask"      element={<AskMemory />} />
           <Route path="/timeline" element={<Timeline />} />
-          <Route path="/focus" element={<FocusMode />} />
+          <Route path="/focus"    element={<FocusMode />} />
         </Routes>
       </main>
 
-      {/* Overlay */}
-      <OverlayRecall />
+      {/* Overlay recall — only in app */}
+      {!isLandingOrAuth && <OverlayRecall />}
 
-      {/* Bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-[#111118]/90 backdrop-blur-lg border-t border-zinc-800/50">
-        <div className="max-w-4xl mx-auto flex justify-around py-3">
-          {NAV.map(n => (
-            <NavLink
-              key={n.to}
-              to={n.to}
-              className={({ isActive }) =>
-                `flex flex-col items-center gap-1 text-xs transition-colors ${
-                  isActive ? 'text-violet-400' : 'text-zinc-500 hover:text-zinc-300'
-                }`
-              }
-            >
-              <span className="text-xl">{n.icon}</span>
-              <span>{n.label}</span>
-            </NavLink>
-          ))}
-        </div>
-      </nav>
+      {/* Bottom Nav — only in app pages */}
+      {!isLandingOrAuth && (
+        <nav style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0,
+          background: 'rgba(2,0,21,0.75)',
+          backdropFilter: 'blur(28px)',
+          WebkitBackdropFilter: 'blur(28px)',
+          borderTop: '1px solid rgba(62,219,240,0.12)',
+          zIndex: 100,
+        }}>
+          {/* Top glow line */}
+          <div style={{
+            position: 'absolute', top: 0, left: '10%', right: '10%', height: 1,
+            background: 'linear-gradient(90deg,transparent,rgba(62,219,240,0.35),transparent)',
+          }} />
+
+          <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', justifyContent: 'space-around', padding: '10px 0 8px' }}>
+            {NAV.map(({ to, Icon, label }) => (
+              <NavLink key={to} to={to} style={{ textDecoration: 'none' }}>
+                {({ isActive }) => (
+                  <div style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                    position: 'relative', padding: '4px 16px',
+                    transition: 'all 0.2s',
+                  }}>
+                    {isActive && (
+                      <div style={{
+                        position: 'absolute', inset: 0,
+                        background: 'rgba(62,219,240,0.07)',
+                        border: '1px solid rgba(62,219,240,0.15)',
+                        borderRadius: 12,
+                        animation: 'scaleIn 0.2s ease-out',
+                      }} />
+                    )}
+                    <div style={{
+                      position: 'relative', zIndex: 1,
+                      filter: isActive ? 'drop-shadow(0 0 8px rgba(62,219,240,0.6))' : 'none',
+                      transform: isActive ? 'scale(1.1)' : 'scale(1)',
+                      transition: 'all 0.2s cubic-bezier(0.34,1.4,0.64,1)',
+                    }}>
+                      <Icon active={isActive} size={21} />
+                      {isActive && (
+                        <div style={{
+                          position: 'absolute', inset: -4,
+                          border: '1px solid rgba(62,219,240,0.4)',
+                          borderRadius: '50%',
+                          animation: 'orbitPing 2s ease-out infinite',
+                        }} />
+                      )}
+                    </div>
+                    <span style={{
+                      position: 'relative', zIndex: 1,
+                      fontSize: 10, fontWeight: isActive ? 600 : 400,
+                      letterSpacing: '0.06em',
+                      color: isActive ? '#3EDBF0' : 'rgba(240,235,204,0.38)',
+                      textShadow: isActive ? '0 0 12px rgba(62,219,240,0.5)' : 'none',
+                      transition: 'all 0.2s',
+                    }}>{label}</span>
+                  </div>
+                )}
+              </NavLink>
+            ))}
+          </div>
+        </nav>
+      )}
     </div>
   )
 }

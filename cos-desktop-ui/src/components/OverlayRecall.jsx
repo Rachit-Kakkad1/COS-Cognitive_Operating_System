@@ -6,31 +6,26 @@ export default function OverlayRecall() {
   const [recall, setRecall] = useState(null)
   const [visible, setVisible] = useState(false)
 
-  // Poll for hotkey recall result every 3 seconds
   useEffect(() => {
-    let lastRecallId = null
-    let lastSwitchTs = null
+    let lastRecallId  = null
+    let lastSwitchTs  = null
 
     const interval = setInterval(async () => {
       try {
-        // 1. Check for context switches first (higher priority)
-        const switchRes = await fetch(`${API}/switch_status`)
+        // 1. Context switch check (higher priority)
+        const switchRes  = await fetch(`${API}/switch_status`)
         const switchData = await switchRes.json()
         if (switchData.event && switchData.event.timestamp !== lastSwitchTs) {
           lastSwitchTs = switchData.event.timestamp
           const prev = switchData.event.from
-          setRecall({
-            ...prev,
-            type: 'switch',
-            message: `Switched from ${prev.app}. Go back?`
-          })
+          setRecall({ ...prev, type: 'switch', message: `Switched from ${prev.app}. Go back?` })
           setVisible(true)
           setTimeout(() => setVisible(false), 8000)
-          return // Skip normal recall if switch alert is shown
+          return
         }
 
         // 2. Normal hotkey recall
-        const res = await fetch(`${API}/hotkey/recall`, { method: 'POST' })
+        const res  = await fetch(`${API}/hotkey/recall`, { method: 'POST' })
         const data = await res.json()
         if (data.result && data.result.memory_id !== lastRecallId) {
           lastRecallId = data.result.memory_id
@@ -38,81 +33,126 @@ export default function OverlayRecall() {
           setVisible(true)
           setTimeout(() => setVisible(false), 8000)
         }
-      } catch {
-        // Backend offline
-      }
+      } catch { /* backend offline */ }
     }, 3000)
 
     return () => clearInterval(interval)
   }, [])
 
   const handleResume = async () => {
-    if (recall.url) {
-      window.open(recall.url, '_blank')
-    } else {
-      // Native app — try to reopen via backend
+    if (recall.url) window.open(recall.url, '_blank')
+    else {
       try {
         await fetch(`${API}/reopen`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            app: recall.app,
-            title: recall.title || null
-          })
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ app: recall.app, title: recall.title || null })
         })
-      } catch (e) {
-        console.error("Failed to reopen native app", e)
-      }
+      } catch {}
     }
     setVisible(false)
   }
 
   if (!visible || !recall) return null
 
+  const isSwitch = recall.type === 'switch'
+
   return (
-    <div className="fixed bottom-20 right-4 z-50 max-w-sm animate-[slideUp_0.3s_ease-out]">
-      <div className={`backdrop-blur-xl border rounded-2xl p-5 shadow-2xl space-y-3
-                      ${recall.type === 'switch' 
-                        ? 'bg-amber-950/90 border-amber-500/40 shadow-amber-500/10' 
-                        : 'bg-zinc-900/95 border-violet-500/30 shadow-violet-500/10'}`}>
-        <div className="flex items-center gap-2">
-          <span className={recall.type === 'switch' ? 'text-amber-400' : 'text-violet-400'}>
-            {recall.type === 'switch' ? '⚠️' : '🧠'}
-          </span>
-          <span className={`text-xs uppercase tracking-wider font-medium 
-                          ${recall.type === 'switch' ? 'text-amber-400/80' : 'text-violet-400/80'}`}>
-            {recall.type === 'switch' ? 'Context Switch' : 'COS Recall'}
-          </span>
+    <div style={{
+      position: 'fixed', bottom: 84, right: 16, zIndex: 1000, maxWidth: 340,
+      animation: 'slideInRight 0.32s cubic-bezier(0.34,1.56,0.64,1)',
+    }}>
+      {/* Card */}
+      <div style={{
+        background: isSwitch
+          ? 'rgba(4,0,80,0.92)'
+          : 'rgba(2,0,21,0.92)',
+        border: `1px solid ${isSwitch ? 'rgba(119,172,241,0.45)' : 'rgba(62,219,240,0.4)'}`,
+        borderRadius: 20, padding: '18px 20px',
+        backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+        boxShadow: isSwitch
+          ? '0 16px 48px rgba(119,172,241,0.12), 0 0 0 1px rgba(119,172,241,0.08)'
+          : '0 16px 48px rgba(62,219,240,0.12), 0 0 0 1px rgba(62,219,240,0.06)',
+        display: 'flex', flexDirection: 'column', gap: 12,
+      }}>
+
+        {/* Badge row */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{
+              fontSize: 18,
+              filter: `drop-shadow(0 0 8px ${isSwitch ? '#77ACF1' : '#3EDBF0'})`,
+            }}>
+              {isSwitch ? '⚡' : '🧠'}
+            </span>
+            <span style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
+              color: isSwitch ? '#77ACF1' : '#3EDBF0',
+            }}>
+              {isSwitch ? 'Context Switch' : 'COS Recall'}
+            </span>
+          </div>
+          <button
+            onClick={() => setVisible(false)}
+            style={{
+              background: 'none', border: 'none', color: 'rgba(240,235,204,0.25)',
+              cursor: 'pointer', fontSize: 16, padding: 0, lineHeight: 1,
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.color = 'rgba(240,235,204,0.6)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'rgba(240,235,204,0.25)'}
+          >×</button>
         </div>
-        <p className="text-sm text-zinc-200">
-          {recall.type === 'switch' ? recall.message : recall.summary}
+
+        {/* Message */}
+        <p style={{ color: 'var(--cream)', fontSize: 13, fontWeight: 500, lineHeight: 1.5 }}>
+          {isSwitch ? recall.message : recall.summary}
         </p>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-zinc-500">
-            {recall.type === 'switch' ? recall.title : `${recall.app} · ${recall.timestamp}`}
+
+        {/* Footer */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ color: 'rgba(240,235,204,0.3)', fontSize: 11 }}>
+            {isSwitch ? recall.title : `${recall.app} · ${recall.timestamp}`}
           </span>
           <button
             onClick={handleResume}
-            className={`text-xs font-medium transition-colors 
-                       ${recall.type === 'switch' ? 'text-amber-400 hover:text-amber-300' : 'text-violet-400 hover:text-violet-300'}`}
+            style={{
+              background: isSwitch
+                ? 'linear-gradient(135deg,rgba(119,172,241,0.2),rgba(119,172,241,0.1))'
+                : 'linear-gradient(135deg,rgba(62,219,240,0.2),rgba(62,219,240,0.1))',
+              border: `1px solid ${isSwitch ? 'rgba(119,172,241,0.4)' : 'rgba(62,219,240,0.4)'}`,
+              borderRadius: 8, padding: '6px 14px',
+              color: isSwitch ? '#77ACF1' : '#3EDBF0',
+              fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              fontFamily: "'Outfit', sans-serif",
+              transition: 'box-shadow 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.boxShadow = `0 0 16px ${isSwitch ? 'rgba(119,172,241,0.3)' : 'rgba(62,219,240,0.3)'}`}
+            onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
           >
-            {recall.type === 'switch' ? 'Take me back ←' : (recall.url ? 'Resume? →' : 'Dismiss')}
+            {isSwitch ? '← Take me back' : (recall.url ? 'Resume →' : 'Dismiss')}
           </button>
         </div>
-        {/* Progress bar auto-dismiss */}
-        <div className="h-0.5 bg-zinc-800 rounded-full overflow-hidden">
-          <div className="h-full bg-violet-500/50 animate-[shrink_8s_linear_forwards]" />
+
+        {/* Auto-dismiss progress bar */}
+        <div style={{ height: 2, background: 'rgba(240,235,204,0.06)', borderRadius: 1, overflow: 'hidden' }}>
+          <div style={{
+            height: '100%',
+            background: `linear-gradient(90deg,${isSwitch ? '#77ACF1' : '#3EDBF0'},${isSwitch ? '#77ACF1aa' : '#3EDBF0aa'})`,
+            boxShadow: `0 0 8px ${isSwitch ? 'rgba(119,172,241,0.5)' : 'rgba(62,219,240,0.5)'}`,
+            borderRadius: 1,
+            animation: 'shrink 8s linear forwards',
+          }} />
         </div>
       </div>
 
       <style>{`
-        @keyframes slideUp {
-          from { transform: translateY(20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
+        @keyframes slideInRight {
+          from { opacity: 0; transform: translateX(32px) scale(0.95); }
+          to   { opacity: 1; transform: translateX(0)   scale(1); }
         }
         @keyframes shrink {
           from { width: 100%; }
-          to { width: 0%; }
+          to   { width: 0%; }
         }
       `}</style>
     </div>
