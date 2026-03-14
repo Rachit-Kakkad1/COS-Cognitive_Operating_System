@@ -57,8 +57,26 @@ export default function Timeline() {
               <div className="space-y-2">
                 {memories.map((m, i) => (
                   <div key={m.memory_id || i}
-                    className="bg-zinc-900/50 border border-zinc-800/40 rounded-xl px-4 py-3 flex items-center gap-4
-                               hover:border-violet-500/20 transition-colors">
+                    onClick={async () => {
+                      if (m.url) {
+                        window.open(m.url, '_blank')
+                      } else {
+                        try {
+                          await fetch(`${API}/reopen`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              app: m.app,
+                              title: m.title || null
+                            })
+                          })
+                        } catch (e) {
+                          console.error("Failed to reopen native app", e)
+                        }
+                      }
+                    }}
+                    className={`bg-zinc-900/50 border border-zinc-800/40 rounded-xl px-4 py-3 flex items-center gap-4
+                               cursor-pointer hover:border-violet-500/40 hover:bg-zinc-900/80 transition-colors`}>
                     <div className={`w-2 h-2 rounded-full bg-${sec.color}-400 shrink-0`} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-zinc-300 truncate">{m.summary || m.title}</p>

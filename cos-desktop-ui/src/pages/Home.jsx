@@ -83,7 +83,27 @@ export default function Home() {
           </div>
           {result.suggestion && (
             <div className="pt-2 border-t border-zinc-800/50">
-              <button className="text-sm text-violet-400 hover:text-violet-300 transition-colors">
+              <button 
+                onClick={async () => {
+                  if (result.url) {
+                    window.open(result.url, '_blank')
+                  } else {
+                    try {
+                      await fetch(`${API}/reopen`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          app: result.app,
+                          title: result.title || null
+                        })
+                      })
+                    } catch (e) {
+                      console.error("Failed to reopen native app", e)
+                    }
+                  }
+                }}
+                className="text-sm text-violet-400 hover:text-violet-300 transition-colors"
+              >
                 {result.suggestion}
               </button>
             </div>

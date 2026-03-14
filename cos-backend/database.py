@@ -8,6 +8,8 @@ import os
 import sqlite3
 import logging
 
+from typing import Optional
+
 logger = logging.getLogger(__name__)
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
@@ -31,20 +33,26 @@ def init_db():
             app TEXT,
             title TEXT,
             summary TEXT,
+            url TEXT,
             cluster_id INTEGER DEFAULT NULL
         )
     """)
+    # Migrations: add url column if it doesn't exist (primitive)
+    try:
+        conn.execute("ALTER TABLE memories ADD COLUMN url TEXT")
+    except sqlite3.OperationalError:
+        pass # already exists
     conn.commit()
     conn.close()
     logger.info(f"Database initialized at {DB_PATH}")
 
 
-def insert_memory(memory_id: str, timestamp: str, app: str, title: str, summary: str):
+def insert_memory(memory_id: str, timestamp: str, app: str, title: str, summary: str, url: Optional[str] = None):
     """Insert a new memory record."""
     conn = _get_conn()
     conn.execute(
-        "INSERT OR IGNORE INTO memories (memory_id, timestamp, app, title, summary) VALUES (?, ?, ?, ?, ?)",
-        (memory_id, timestamp, app, title, summary),
+        "INSERT OR IGNORE INTO memories (memory_id, timestamp, app, title, summary, url) VALUES (?, ?, ?, ?, ?, ?)",
+        (memory_id, timestamp, app, title, summary, url),
     )
     conn.commit()
     conn.close()

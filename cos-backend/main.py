@@ -55,6 +55,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Global state for context switching
+_last_memory = None
+_switch_event = None  # Stores { "from": memory_dict, "timestamp": iso_str }
+
 app = FastAPI(title="NEWCOS Backend", version="1.0.0")
 
 app.add_middleware(
@@ -78,8 +82,14 @@ async def log_requests(request: Request, call_next):
 class SnapshotInput(BaseModel):
     app: str
     title: str
+    url: Optional[str] = None
     text: Optional[str] = ""
     timestamp: Optional[str] = None
+
+
+class ReopenRequest(BaseModel):
+    app: str
+    title: Optional[str] = None
 
 
 # ─── Endpoints ───────────────────────────────────────────────────────────
@@ -94,11 +104,21 @@ async def ingest_memory(snap: SnapshotInput):
     """Ingest a new context snapshot: embed → store in SQLite + FAISS + graph."""
     process = _get_pipeline()
     ge = _get_graph_engine()
+    global _last_memory, _switch_event
 
     ts = snap.timestamp or datetime.now().strftime("%Y-%m-%d %H:%M")
     snapshot = {"app": snap.app, "title": snap.title, "text": snap.text or "", "timestamp": ts}
 
     result = process(snapshot)
+
+    # Detect Switch
+    if _last_memory and (_last_memory["app"] != snap.app or _last_memory["title"] != snap.title):
+        logger.info(f"[Switch] Detected context switch from {_last_memory['app']} to {snap.app}")
+        _switch_event = {
+            "from": _last_memory,
+            "to": snapshot,
+            "timestamp": datetime.now().isoformat()
+        }
 
     # Store in SQLite
     insert_memory(
@@ -107,7 +127,18 @@ async def ingest_memory(snap: SnapshotInput):
         app=snap.app,
         title=snap.title,
         summary=result["summary"],
+        url=snap.url,
     )
+    
+    # Update last memory (include URL)
+    _last_memory = {
+        "memory_id": result["memory_id"],
+        "app": snap.app,
+        "title": snap.title,
+        "summary": result["summary"],
+        "url": snap.url,
+        "timestamp": ts
+    }
 
     # Store in FAISS
     vector_store.add_vector(result["memory_id"], result["embedding"])
@@ -187,6 +218,51 @@ async def hotkey_recall():
     if result["results"]:
         return {"result": result["results"][0]}
     return {"result": None, "message": "No matching memory found."}
+
+
+@app.post("/reopen")
+async def reopen_app(req: ReopenRequest):
+    """Try to find and activate a native app window."""
+    try:
+        import pygetwindow as gw
+        
+        # Try finding by exact title first
+        win = None
+        if req.title:
+            wins = gw.getWindowsWithTitle(req.title)
+            if wins:
+                win = wins[0]
+        
+        # If not found, try by app name
+        if not win:
+            wins = [w for w in gw.getAllWindows() if req.app.lower() in w.title.lower()]
+            if wins:
+                win = wins[0]
+        
+        if win:
+            if win.isMinimized:
+                win.restore()
+            win.activate()
+            return {"status": "activated", "title": win.title}
+        
+        return {"status": "not_found"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/switch_status")
+async def get_switch_status():
+    """Returns the latest context switch event if it happened recently (last 10s)."""
+    global _switch_event
+    if not _switch_event:
+        return {"event": None}
+    
+    # Check if event is recent (within 10 seconds)
+    event_ts = datetime.fromisoformat(_switch_event["timestamp"])
+    if datetime.now() - event_ts > timedelta(seconds=10):
+        return {"event": None}
+        
+    return {"event": _switch_event}
 
 
 if __name__ == "__main__":

@@ -14,6 +14,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const statusDot = document.getElementById("status-dot");
   const captureBtn = document.getElementById("capture-now");
   const openCosBtn = document.getElementById("open-cos");
+  const autoCaptureToggle = document.getElementById("auto-capture-toggle");
+  const lastCaptureTimeEl = document.getElementById("last-capture-time");
 
   // ─── Current tab title ──────────────────────────────────────────────
   try {
@@ -68,6 +70,30 @@ document.addEventListener("DOMContentLoaded", async () => {
   } catch {
     queueCountEl.textContent = "0";
   }
+
+  // ─── Auto-Capture Toggle ────────────────────────────────────────────
+  try {
+    const data = await chrome.storage.local.get({ auto_capture_enabled: true });
+    autoCaptureToggle.checked = data.auto_capture_enabled;
+  } catch {}
+
+  autoCaptureToggle.addEventListener("change", async () => {
+    await chrome.storage.local.set({ auto_capture_enabled: autoCaptureToggle.checked });
+  });
+
+  // ─── Last Capture Time ──────────────────────────────────────────────
+  const updateLastCapture = async () => {
+    try {
+      const data = await chrome.storage.local.get("last_capture_ts");
+      if (data.last_capture_ts) {
+        const diff = Math.round((Date.now() - data.last_capture_ts) / 1000);
+        if (diff < 60) lastCaptureTimeEl.textContent = `${diff}s ago`;
+        else lastCaptureTimeEl.textContent = `${Math.floor(diff / 60)}m ago`;
+      }
+    } catch {}
+  };
+  updateLastCapture();
+  setInterval(updateLastCapture, 10000);
 
   // ─── Capture Now button ─────────────────────────────────────────────
   captureBtn.addEventListener("click", async () => {

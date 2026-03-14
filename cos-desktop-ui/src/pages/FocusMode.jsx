@@ -1,53 +1,27 @@
-import { useState, useEffect, useRef } from 'react'
-
-const FOCUS_DURATION = 25 * 60 // 25 minutes in seconds
+import { useEffect } from 'react'
+import { useFocus } from '../context/FocusContext'
 
 export default function FocusMode() {
-  const [secondsLeft, setSecondsLeft] = useState(FOCUS_DURATION)
-  const [running, setRunning] = useState(false)
-  const [done, setDone] = useState(false)
-  const [currentTask, setCurrentTask] = useState(null)
-  const intervalRef = useRef(null)
+  const {
+    secondsLeft, running, done, currentTask, setCurrentTask,
+    start, pause, reset, FOCUS_DURATION
+  } = useFocus()
 
-  // Fetch current top task
+  // Fetch current top task if not already set
   useEffect(() => {
-    fetch('http://localhost:8000/hotkey/recall', { method: 'POST' })
-      .then(r => r.json())
-      .then(data => {
-        if (data.result) setCurrentTask(data.result)
-      })
-      .catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    if (running && secondsLeft > 0) {
-      intervalRef.current = setInterval(() => {
-        setSecondsLeft(s => {
-          if (s <= 1) {
-            clearInterval(intervalRef.current)
-            setRunning(false)
-            setDone(true)
-            return 0
-          }
-          return s - 1
+    if (!currentTask) {
+      fetch('http://localhost:8000/hotkey/recall', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          if (data.result) setCurrentTask(data.result)
         })
-      }, 1000)
+        .catch(() => {})
     }
-    return () => clearInterval(intervalRef.current)
-  }, [running])
+  }, [currentTask, setCurrentTask])
 
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, '0')
   const ss = String(secondsLeft % 60).padStart(2, '0')
   const progress = ((FOCUS_DURATION - secondsLeft) / FOCUS_DURATION) * 100
-
-  const start = () => { setRunning(true); setDone(false) }
-  const pause = () => { setRunning(false); clearInterval(intervalRef.current) }
-  const reset = () => {
-    setRunning(false)
-    setDone(false)
-    setSecondsLeft(FOCUS_DURATION)
-    clearInterval(intervalRef.current)
-  }
 
   return (
     <div className="flex flex-col items-center justify-center space-y-8 pt-12">

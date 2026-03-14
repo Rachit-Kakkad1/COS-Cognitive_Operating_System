@@ -25,7 +25,22 @@
     <div class="label">Queued offline</div>
     <div id="queue-count" class="value">0</div>
   </div>
-  <button id="capture-now">Capture Now</button>
+  <div class="section">
+    <div class="flex-between">
+      <div class="label">Auto-Capture</div>
+      <label class="switch">
+        <input type="checkbox" id="auto-capture-toggle" checked>
+        <span class="slider round"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="label">Last captured</div>
+    <div id="last-capture-time" class="value">Never</div>
+  </div>
+
+  <button id="capture-now">Manual Capture</button>
   <button id="open-cos">Open COS</button>
   <script src="popup.js"></script>
 </body>

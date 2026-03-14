@@ -40,6 +40,13 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 
     // Persist for popup
     await chrome.storage.local.set({ active_tab: activeTabInfo });
+
+    // Capture the NEW tab immediately to trigger the "Take me back" notification on switch
+    if (activeTabInfo.url) {
+      setTimeout(() => {
+        captureAndSend(activeTabInfo.tabId, 0, false, true); // force=true
+      }, 500); 
+    }
   } catch {
     // Tab may have closed between activation and get
   }
@@ -70,6 +77,10 @@ chrome.alarms.create("cos_capture", { periodInMinutes: 0.5 });
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === "cos_capture") {
+    // Check if auto-capture is enabled
+    const settings = await chrome.storage.local.get({ auto_capture_enabled: true });
+    if (!settings.auto_capture_enabled) return;
+
     const timeSpent = Math.round((Date.now() - activeTabInfo.activatedAt) / 1000);
     if (activeTabInfo.url) {
       await captureAndSend(activeTabInfo.tabId, timeSpent);
@@ -80,9 +91,9 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 // ─── Core: Capture DOM text + Send ──────────────────────────────────────
 
-async function captureAndSend(tabId, timeSpentSeconds, skipDom = false) {
+async function captureAndSend(tabId, timeSpentSeconds, skipDom = false, force = false) {
   let domText = "";
-
+ 
   if (!skipDom && tabId) {
     try {
       const response = await chrome.tabs.sendMessage(tabId, { type: "GET_DOM_TEXT" });
@@ -91,18 +102,18 @@ async function captureAndSend(tabId, timeSpentSeconds, skipDom = false) {
       // Content script not injected (chrome:// pages, etc.)
     }
   }
-
-  await sendSnapshot(activeTabInfo.url, activeTabInfo.title, domText, timeSpentSeconds);
+ 
+  await sendSnapshot(activeTabInfo.url, activeTabInfo.title, domText, timeSpentSeconds, force);
 }
 
 
 // ─── C. Send Snapshot to Backend ─────────────────────────────────────────
 
-async function sendSnapshot(url, title, domText, timeSpentSeconds) {
+async function sendSnapshot(url, title, domText, timeSpentSeconds, force = false) {
   // E. Deduplication
   const dedupKey = `${url}|${title}`;
   const stored = await chrome.storage.local.get("last_snapshot");
-  if (stored.last_snapshot === dedupKey) {
+  if (!force && stored.last_snapshot === dedupKey) {
     return; // identical to last sent — skip
   }
 
@@ -132,7 +143,10 @@ async function sendSnapshot(url, title, domText, timeSpentSeconds) {
 
     if (resp.ok) {
       console.log("[COS Extension] Snapshot sent:", title);
-      await chrome.storage.local.set({ last_snapshot: dedupKey });
+      await chrome.storage.local.set({ 
+        last_snapshot: dedupKey,
+        last_capture_ts: Date.now() 
+      });
 
       // Increment daily counter
       const today = new Date().toDateString();
