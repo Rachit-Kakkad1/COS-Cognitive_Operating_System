@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="header">
+    <span class="logo">🧠 COS</span>
+    <span id="status-dot" class="dot offline"></span>
+  </div>
+  <div class="section">
+    <div class="label">Currently capturing</div>
+    <div id="current-tab" class="value">Loading...</div>
+  </div>
+  <div class="section">
+    <div class="label">Time on page</div>
+    <div id="time-spent" class="value">0s</div>
+  </div>
+  <div class="section">
+    <div class="label">Snapshots today</div>
+    <div id="snapshot-count" class="value">0</div>
+  </div>
+  <div class="section">
+    <div class="label">Queued offline</div>
+    <div id="queue-count" class="value">0</div>
+  </div>
+  <button id="capture-now">Capture Now</button>
+  <button id="open-cos">Open COS</button>
+  <script src="popup.js"></script>
+</body>
+</html>

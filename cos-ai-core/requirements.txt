@@ -1,0 +1,13 @@
+pygetwindow>=0.0.9
+psutil>=5.9.0
+pyperclip>=1.8.2
+sentence-transformers>=2.2.2
+openai-whisper>=20231117
+webrtcvad==2.0.10
+sounddevice>=0.4.6
+rnnoise-python>=0.1.0
+numpy>=1.24.0
+torch>=2.0.0
+keyboard>=0.13.5
+requests>=2.31.0
+networkx>=3.1
