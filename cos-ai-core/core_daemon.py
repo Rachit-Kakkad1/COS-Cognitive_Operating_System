@@ -29,10 +29,14 @@ except ImportError as e:
     print(f"[Daemon] Voice listener unavailable ({e}) — hotkey mode only")
 
 BACKEND_URL = "http://localhost:8000"
+EMP_TOKEN = os.getenv("COS_EMP_TOKEN", "")
 
 # Track current context for drift detection
 _current_app = "Unknown"
 _current_embedding = None
+_context_switches = 0
+_session_start = time.time()
+_last_app = ""
 
 
 def _on_snapshot(snapshot: dict):
@@ -44,8 +48,24 @@ def _on_snapshot(snapshot: dict):
         result = process_snapshot(snapshot)
         _current_embedding = result.get("embedding")
 
+        # Track context switches
+        global _context_switches, _session_start, _last_app
+        if _last_app and _last_app != _current_app:
+            _context_switches += 1
+        _last_app = _current_app
+
         # Send to backend for storage
         requests.post(f"{BACKEND_URL}/memory", json=snapshot, timeout=5)
+
+        # Post WorkSense snapshot
+        session_minutes = int((time.time() - _session_start) / 60)
+        post_worksense_snapshot(
+            app=_current_app,
+            title=snapshot.get("title", ""),
+            context_switches=_context_switches,
+            session_minutes=session_minutes,
+            is_idle=False,
+        )
     except requests.exceptions.ConnectionError:
         print("[Daemon] Backend unreachable — snapshot queued locally only")
     except Exception as e:
@@ -70,6 +90,31 @@ def _hotkey_recall():
             print("[Hotkey] No memory found.")
     except Exception as e:
         print(f"[Hotkey] Error: {e}")
+
+
+def post_worksense_snapshot(app: str, title: str,
+                             context_switches: int = 0,
+                             session_minutes: int = 0,
+                             is_idle: bool = False):
+    """Posts cognitive snapshot to WorkSense every 30 seconds."""
+    if not EMP_TOKEN:
+        return  # Skip if not WorkSense employee
+    try:
+        requests.post(
+            f"{BACKEND_URL}/worksense/employee/snapshot",
+            json={
+                "app":              app,
+                "title":            title,
+                "context_switches": context_switches,
+                "session_minutes":  session_minutes,
+                "is_idle":          is_idle,
+            },
+            headers={"Authorization": f"Bearer {EMP_TOKEN}"},
+            timeout=2,
+        )
+        print(f"[WorkSense] Snapshot posted: {app} · switches:{context_switches}")
+    except Exception as e:
+        print(f"[WorkSense] Snapshot failed (backend offline): {e}")
 
 
 def _handle_voice_transcript(text: str):

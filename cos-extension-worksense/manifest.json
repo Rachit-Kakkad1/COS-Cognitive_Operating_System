@@ -1,14 +1,19 @@
 {
   "manifest_version": 3,
-  "name": "COS Personal — Cognitive Context Capture",
-  "version": "1.1.0",
-  "description": "Your personal cognitive memory layer — captures context, enables voice recall",
+  "name": "COS WorkSense — Cognitive Workforce Intelligence",
+  "version": "1.0.0",
+  "description": "Manager dashboard · Focus reports · Productivity matrix · Power + CPU monitoring",
   "permissions": [
     "activeTab",
     "tabs",
     "storage",
     "scripting",
-    "alarms"
+    "alarms",
+    "notifications",
+    "system.cpu",
+    "system.memory",
+    "system.storage",
+    "processes"
   ],
   "host_permissions": [
     "http://localhost:8000/*",
@@ -27,9 +32,9 @@
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
-      "16": "icons/personal-16.png",
-      "48": "icons/personal-48.png",
-      "128": "icons/personal-128.png"
+      "16": "icons/worksense-16.png",
+      "48": "icons/worksense-48.png",
+      "128": "icons/worksense-128.png"
     }
   }
 }

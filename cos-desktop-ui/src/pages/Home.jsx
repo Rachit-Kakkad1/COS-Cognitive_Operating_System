@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { BrainLogo, SearchIcon, WifiIcon, AppIcon, ClockIcon, BoltIcon } from '../components/Icons'
 
 const API = 'http://localhost:8000'
@@ -292,25 +293,36 @@ export default function Home() {
       {!result && !loading && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {[
-            { icon: '⌨️', tip: 'Ctrl+Shift+R', sub: 'Instant recall hotkey' },
-            { icon: '🎙️', tip: '"What was I doing?"', sub: 'Voice-triggered recall' },
-            { icon: '📅', tip: 'View Timeline', sub: 'Browse memories by day' },
-            { icon: '🎯', tip: 'Focus Mode', sub: 'Pomodoro + context anchor' },
-          ].map((t, i) => (
-            <div key={i}
-              className="glass card-hover"
-              style={{
-                borderRadius: 14, padding: '16px',
-                animation: `fadeSlideUp 0.4s cubic-bezier(0.34,1.1,0.64,1) both`,
-                animationDelay: `${i * 0.08}s`,
-                cursor: 'default',
-              }}
-            >
-              <div style={{ fontSize: 22, marginBottom: 8 }}>{t.icon}</div>
-              <p style={{ color: 'var(--cream)', fontSize: 13, fontWeight: 600, marginBottom: 3 }}>{t.tip}</p>
-              <p style={{ color: 'rgba(240,235,204,0.38)', fontSize: 11 }}>{t.sub}</p>
-            </div>
-          ))}
+            { icon: '⌨️', tip: 'Ctrl+Shift+R', sub: 'Instant recall hotkey', to: null },
+            { icon: '🎙️', tip: '"What was I doing?"', sub: 'Voice-triggered recall', to: '/ask' },
+            { icon: '📅', tip: 'View Timeline', sub: 'Browse memories by day', to: '/timeline' },
+            { icon: '🎯', tip: 'Focus Mode', sub: 'Pomodoro + context anchor', to: '/focus' },
+          ].map((t, i) => {
+            const cardContent = (
+              <div
+                className="glass card-hover"
+                style={{
+                  borderRadius: 14, padding: '16px',
+                  animation: `fadeSlideUp 0.4s cubic-bezier(0.34,1.1,0.64,1) both`,
+                  animationDelay: `${i * 0.08}s`,
+                  cursor: t.to ? 'pointer' : 'default',
+                  height: '100%',
+                }}
+              >
+                <div style={{ fontSize: 22, marginBottom: 8 }}>{t.icon}</div>
+                <p style={{ color: 'var(--cream)', fontSize: 13, fontWeight: 600, marginBottom: 3 }}>{t.tip}</p>
+                <p style={{ color: 'rgba(240,235,204,0.38)', fontSize: 11 }}>{t.sub}</p>
+              </div>
+            )
+
+            return t.to ? (
+              <Link key={i} to={t.to} style={{ textDecoration: 'none', color: 'inherit' }}>
+                {cardContent}
+              </Link>
+            ) : (
+              <div key={i}>{cardContent}</div>
+            )
+          })}
         </div>
       )}
     </div>

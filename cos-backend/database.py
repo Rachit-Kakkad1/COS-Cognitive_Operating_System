@@ -24,7 +24,7 @@ def _get_conn() -> sqlite3.Connection:
 
 
 def init_db():
-    """Create memories table if it does not exist."""
+    """Create all tables if they do not exist."""
     conn = _get_conn()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS memories (
@@ -42,6 +42,63 @@ def init_db():
         conn.execute("ALTER TABLE memories ADD COLUMN url TEXT")
     except sqlite3.OperationalError:
         pass # already exists
+
+    # ── WorkSense Tables ─────────────────────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS organizations (
+            org_id TEXT PRIMARY KEY,
+            org_name TEXT NOT NULL,
+            org_code TEXT UNIQUE NOT NULL,
+            manager_email TEXT NOT NULL,
+            manager_password_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS employees (
+            emp_id TEXT PRIMARY KEY,
+            org_id TEXT NOT NULL,
+            emp_code TEXT UNIQUE NOT NULL,
+            temp_password_hash TEXT NOT NULL,
+            name TEXT,
+            is_active INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (org_id) REFERENCES organizations(org_id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS employee_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            emp_id TEXT NOT NULL,
+            org_id TEXT NOT NULL,
+            app TEXT,
+            title TEXT,
+            focus_score INTEGER DEFAULT 0,
+            context_switches INTEGER DEFAULT 0,
+            session_minutes INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'active',
+            is_idle INTEGER DEFAULT 0,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (emp_id) REFERENCES employees(emp_id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS tab_switches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            emp_id TEXT NOT NULL,
+            from_app TEXT,
+            from_title TEXT,
+            from_focus_score INTEGER,
+            from_session_minutes INTEGER,
+            to_app TEXT,
+            to_title TEXT,
+            guardian_shown INTEGER DEFAULT 1,
+            user_returned INTEGER DEFAULT 0,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    logger.info("[DB] WorkSense tables ready: organizations, employees, employee_snapshots, tab_switches")
+
     conn.commit()
     conn.close()
     logger.info(f"Database initialized at {DB_PATH}")

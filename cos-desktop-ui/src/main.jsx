@@ -5,13 +5,16 @@ import App from './App'
 import './index.css'
 
 import { FocusProvider } from './context/FocusContext'
+import { ThemeProvider } from './context/ThemeContext'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
-      <FocusProvider>
-        <App />
-      </FocusProvider>
+      <ThemeProvider>
+        <FocusProvider>
+          <App />
+        </FocusProvider>
+      </ThemeProvider>
     </BrowserRouter>
   </React.StrictMode>,
 )

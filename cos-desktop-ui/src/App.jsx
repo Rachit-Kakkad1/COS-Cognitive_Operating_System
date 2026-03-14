@@ -5,7 +5,11 @@ import Home from './pages/Home'
 import AskMemory from './pages/AskMemory'
 import Timeline from './pages/Timeline'
 import FocusMode from './pages/FocusMode'
+import WorkSense from './pages/WorkSense'
 import OverlayRecall from './components/OverlayRecall'
+import TabGuardian from './components/TabGuardian'
+import SystemGuardian from './components/SystemGuardian'
+import StoragePaywall from './components/StoragePaywall'
 import { HomeIcon, MicIcon, TimelineIcon, FocusIcon } from './components/Icons'
 
 const NAV = [
@@ -13,6 +17,7 @@ const NAV = [
   { to: '/ask',       Icon: MicIcon,      label: 'Ask' },
   { to: '/timeline',  Icon: TimelineIcon, label: 'Timeline' },
   { to: '/focus',     Icon: FocusIcon,    label: 'Focus' },
+  { to: '/worksense', Icon: FocusIcon,    label: 'WorkSense' },
 ]
 
 export default function App() {
@@ -34,11 +39,15 @@ export default function App() {
           <Route path="/ask"      element={<AskMemory />} />
           <Route path="/timeline" element={<Timeline />} />
           <Route path="/focus"    element={<FocusMode />} />
+          <Route path="/worksense" element={<WorkSense />} />
         </Routes>
       </main>
 
       {/* Overlay recall — only in app */}
       {!isLandingOrAuth && <OverlayRecall />}
+      <TabGuardian />
+      <SystemGuardian />
+      <StoragePaywall />
 
       {/* Bottom Nav — only in app pages */}
       {!isLandingOrAuth && (

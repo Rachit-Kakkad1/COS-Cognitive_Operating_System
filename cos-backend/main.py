@@ -16,17 +16,21 @@ import os
 import logging
 from datetime import datetime, timedelta
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
+import psutil
+import subprocess
 from typing import Optional
 
 # Add cos-ai-core to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "cos-ai-core"))
 
-from database import insert_memory, get_all_memories, get_memories_by_app, get_memories_by_date, get_memory_by_id
+from database import insert_memory, get_all_memories, get_memories_by_app, get_memories_by_date, get_memory_by_id, _get_conn
 from vector_store import vector_store
 from recall_engine import recall
+from worksense import worksense_router, verify_token
 
 # Lazy import to avoid loading model at import time if not needed
 _pipeline = None
@@ -68,6 +72,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ─── WorkSense API ───────────────────────────────────────────────────────
+app.include_router(worksense_router)
 
 
 # ─── Request logging middleware ──────────────────────────────────────────
@@ -174,34 +181,41 @@ async def get_graph():
 
 
 @app.get("/timeline")
-async def get_timeline():
-    """All memories grouped by: today / yesterday / last_week / last_month."""
-    all_memories = get_all_memories()
-    now = datetime.now()
-    today_str = now.strftime("%Y-%m-%d")
-    yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-    week_ago = now - timedelta(days=7)
-    month_ago = now - timedelta(days=30)
-
-    groups = {"today": [], "yesterday": [], "last_week": [], "last_month": []}
-
-    for m in all_memories:
-        ts = m.get("timestamp", "")
-        if ts.startswith(today_str):
-            groups["today"].append(m)
-        elif ts.startswith(yesterday_str):
-            groups["yesterday"].append(m)
-        else:
-            try:
-                dt = datetime.strptime(ts[:10], "%Y-%m-%d")
-                if dt >= week_ago:
-                    groups["last_week"].append(m)
-                elif dt >= month_ago:
-                    groups["last_month"].append(m)
-            except ValueError:
-                groups["last_month"].append(m)
-
-    return groups
+async def timeline_by_period(
+    period: str = Query(default="today"),
+    authorization: str = Header(default=None)
+):
+    """
+    Returns memories for a specific time period.
+    Periods: today · yesterday · last_week ·
+             last_month · last_2months · last_6months
+    """
+    PERIOD_SQL = {
+        "today":        "DATE(timestamp) = DATE('now')",
+        "yesterday":    "DATE(timestamp) = DATE('now','-1 day')",
+        "last_week":    "timestamp >= datetime('now','-7 days')",
+        "last_month":   "timestamp >= datetime('now','-30 days')"
+                        " AND timestamp < datetime('now','-7 days')",
+        "last_2months": "timestamp >= datetime('now','-60 days')"
+                        " AND timestamp < datetime('now','-30 days')",
+        "last_6months": "timestamp >= datetime('now','-180 days')"
+                        " AND timestamp < datetime('now','-60 days')",
+    }
+    where = PERIOD_SQL.get(period, PERIOD_SQL["today"])
+    conn  = _get_conn()
+    rows  = conn.execute(f"""
+        SELECT memory_id, title, summary, app, timestamp
+        FROM memories
+        WHERE {where}
+        ORDER BY timestamp DESC
+        LIMIT 200
+    """).fetchall()
+    conn.close()
+    return {
+        "period":   period,
+        "memories": [dict(r) for r in rows],
+        "count":    len(rows)
+    }
 
 
 @app.post("/hotkey/recall")
@@ -250,6 +264,118 @@ async def reopen_app(req: ReopenRequest):
         return {"status": "error", "message": str(e)}
 
 
+@app.get("/system/power-monitor")
+async def power_monitor():
+    """
+    Returns top power-consuming processes across entire OS.
+    Works for Personal, Teams, WorkSense.
+    """
+    processes = []
+    for proc in psutil.process_iter(
+        ['pid','name','cpu_percent','memory_percent',
+         'status','create_time']
+    ):
+        try:
+            info = proc.info
+            if info['cpu_percent'] is None: continue
+            processes.append({
+                "pid":         info['pid'],
+                "name":        info['name'],
+                "cpu_pct":     round(info['cpu_percent'], 1),
+                "memory_pct":  round(info['memory_percent'], 1),
+                "status":      info['status'],
+            })
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    # Sort by CPU usage
+    processes.sort(key=lambda x: x['cpu_pct'], reverse=True)
+    top = processes[:10]
+
+    # Flag critical processes
+    for p in top:
+        p['critical'] = p['cpu_pct'] >= 85
+        p['warning']  = 60 <= p['cpu_pct'] < 85
+        p['power_level'] = (
+            'critical' if p['cpu_pct'] >= 85 else
+            'high'     if p['cpu_pct'] >= 60 else
+            'medium'   if p['cpu_pct'] >= 30 else
+            'low'
+        )
+
+    return {
+        "processes":    top,
+        "critical_count": sum(1 for p in top if p['critical']),
+        "timestamp":    datetime.now().isoformat()
+    }
+
+
+@app.post("/system/kill-process")
+async def kill_process(request: Request):
+    """
+    Kills a process by PID.
+    All plans — user must confirm first.
+    """
+    data = await request.json()
+    pid  = data.get("pid")
+    if not pid:
+        raise HTTPException(status_code=400, detail="PID required")
+    try:
+        proc = psutil.Process(pid)
+        name = proc.name()
+        proc.terminate()
+        print(f"[TaskKiller] Terminated: {name} (PID {pid})")
+        return {
+            "status":  "terminated",
+            "process": name,
+            "pid":     pid
+        }
+    except psutil.NoSuchProcess:
+        return {"status": "already_gone", "pid": pid}
+    except psutil.AccessDenied:
+        return {"status": "access_denied",
+                "message": "Run COS as administrator to kill this process"}
+
+
+@app.get("/system/cpu-snapshot")
+async def cpu_snapshot():
+    """
+    Quick CPU snapshot — used to trigger alerts.
+    Fires every 10 seconds from frontend polling.
+    """
+    cpu_total = psutil.cpu_percent(interval=0.5)
+    memory    = psutil.virtual_memory()
+    battery   = None
+    try:
+        bat     = psutil.sensors_battery()
+        battery = {
+            "percent":   bat.percent,
+            "plugged":   bat.power_plugged,
+            "secs_left": bat.secsleft
+        } if bat else None
+    except Exception:
+        pass
+
+    # Get top CPU process
+    top_proc = max(
+        psutil.process_iter(['pid','name','cpu_percent']),
+        key=lambda p: p.info.get('cpu_percent') or 0,
+        default=None
+    )
+
+    return {
+        "cpu_total":    cpu_total,
+        "memory_pct":   memory.percent,
+        "battery":      battery,
+        "spike":        cpu_total >= 85,
+        "top_process": {
+            "name":    top_proc.info['name'],
+            "pid":     top_proc.info['pid'],
+            "cpu_pct": top_proc.info['cpu_percent']
+        } if top_proc else None
+    }
+
+
 @app.get("/switch_status")
 async def get_switch_status():
     """Returns the latest context switch event if it happened recently (last 10s)."""
@@ -265,7 +391,79 @@ async def get_switch_status():
     return {"event": _switch_event}
 
 
+@app.get("/storage/status")
+async def storage_status(
+    authorization: str = Header(default=None)
+):
+    """
+    Checks if user has hit their storage limit.
+    Personal: 3 months · Teams: 6 months · WorkSense: unlimited
+    """
+    token   = (authorization or "").replace("Bearer ", "")
+    payload = verify_token(token) if token else {}
+    plan    = payload.get("plan", "personal")
+
+    LIMITS = {
+        "personal":  90,   # days
+        "teams":     180,  # days
+        "worksense": None  # unlimited
+    }
+
+    limit_days = LIMITS.get(plan)
+    if limit_days is None:
+        return { "plan": plan, "limit_reached": False,
+                 "unlimited": True }
+
+    conn     = _get_conn()
+    oldest   = conn.execute("""
+        SELECT MIN(timestamp) as oldest FROM memories
+    """).fetchone()
+    total    = conn.execute(
+        "SELECT COUNT(*) as cnt FROM memories"
+    ).fetchone()
+    conn.close()
+
+    if not oldest["oldest"]:
+        return { "plan": plan, "limit_reached": False,
+                 "days_used": 0, "limit_days": limit_days }
+
+    from datetime import datetime
+    oldest_dt  = datetime.fromisoformat(oldest["oldest"])
+    days_used  = (datetime.now() - oldest_dt).days
+    pct_used   = round(days_used / limit_days * 100)
+    approaching = pct_used >= 80
+
+    return {
+        "plan":          plan,
+        "limit_reached": days_used >= limit_days,
+        "approaching":   approaching,
+        "days_used":     days_used,
+        "limit_days":    limit_days,
+        "pct_used":      pct_used,
+        "total_memories": total["cnt"],
+        "message": (
+            f"Storage limit reached — {days_used} days of data stored. "
+            f"Upgrade to keep your memories or delete and start fresh."
+            if days_used >= limit_days else
+            f"{limit_days - days_used} days remaining on {plan} plan"
+        )
+    }
+
+@app.delete("/storage/clear")
+async def storage_clear(
+    authorization: str = Header(default=None)
+):
+    """Deletes all memories — fresh start."""
+    conn = _get_conn()
+    conn.execute("DELETE FROM memories")
+    conn.commit()
+    conn.close()
+    return { "status": "cleared",
+             "message": "All memories deleted — fresh start" }
+
+
 if __name__ == "__main__":
     import uvicorn
     print("🧠 NEWCOS Backend starting on http://localhost:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        

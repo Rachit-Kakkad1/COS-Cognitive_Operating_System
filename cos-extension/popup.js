@@ -2,6 +2,7 @@
  * COS Chrome Extension — Popup Script
  *
  * Wires all UI elements: current tab, time spent, counts, status dot, buttons.
+ * Updated for premium UI layout.
  */
 
 const BACKEND_URL = "http://localhost:8000";
@@ -11,7 +12,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const timeSpentEl = document.getElementById("time-spent");
   const snapshotCountEl = document.getElementById("snapshot-count");
   const queueCountEl = document.getElementById("queue-count");
+  const totalMemoriesEl = document.getElementById("total-memories");
+  const statusPill = document.getElementById("status-pill");
   const statusDot = document.getElementById("status-dot");
+  const statusText = document.getElementById("status-text");
   const captureBtn = document.getElementById("capture-now");
   const openCosBtn = document.getElementById("open-cos");
   const autoCaptureToggle = document.getElementById("auto-capture-toggle");
@@ -27,16 +31,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     currentTabEl.textContent = "Unable to read tab";
   }
 
-  // ─── Backend health check → green/red dot ───────────────────────────
+  // ─── Backend health check → status pill ─────────────────────────────
   try {
     const resp = await fetch(`${BACKEND_URL}/health`, { signal: AbortSignal.timeout(2000) });
     if (resp.ok) {
-      statusDot.classList.remove("offline");
-      statusDot.classList.add("online");
+      const data = await resp.json();
+      statusPill.classList.add("online");
+      statusText.textContent = "Live";
+
+      // Show total memories from backend
+      if (data.memories !== undefined) {
+        totalMemoriesEl.textContent = String(data.memories);
+      }
     }
   } catch {
-    statusDot.classList.remove("online");
-    statusDot.classList.add("offline");
+    statusPill.classList.remove("online");
+    statusText.textContent = "Offline";
   }
 
   // ─── Time spent on current tab ──────────────────────────────────────
@@ -87,8 +97,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       const data = await chrome.storage.local.get("last_capture_ts");
       if (data.last_capture_ts) {
         const diff = Math.round((Date.now() - data.last_capture_ts) / 1000);
-        if (diff < 60) lastCaptureTimeEl.textContent = `${diff}s ago`;
-        else lastCaptureTimeEl.textContent = `${Math.floor(diff / 60)}m ago`;
+        if (diff < 60) lastCaptureTimeEl.textContent = `${diff}s`;
+        else if (diff < 3600) lastCaptureTimeEl.textContent = `${Math.floor(diff / 60)}m`;
+        else lastCaptureTimeEl.textContent = `${Math.floor(diff / 3600)}h`;
       }
     } catch {}
   };
@@ -97,19 +108,35 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ─── Capture Now button ─────────────────────────────────────────────
   captureBtn.addEventListener("click", async () => {
-    captureBtn.textContent = "Capturing...";
+    const btnText = captureBtn.querySelector(".btn-text");
+    const btnIcon = captureBtn.querySelector(".btn-icon");
+    btnText.textContent = "Capturing…";
+    btnIcon.textContent = "⏳";
     captureBtn.disabled = true;
     try {
       await chrome.runtime.sendMessage({ type: "CAPTURE_NOW" });
-      captureBtn.textContent = "✓ Captured!";
+      btnText.textContent = "Captured!";
+      btnIcon.textContent = "✓";
+      captureBtn.classList.add("success");
+
+      // Update count
+      const today = new Date().toDateString();
+      const data = await chrome.storage.local.get("snapshot_counts");
+      const counts = data.snapshot_counts || {};
+      snapshotCountEl.textContent = String(counts[today] || 0);
+
       setTimeout(() => {
-        captureBtn.textContent = "Capture Now";
+        btnText.textContent = "Capture Now";
+        btnIcon.textContent = "⚡";
         captureBtn.disabled = false;
+        captureBtn.classList.remove("success");
       }, 1500);
     } catch {
-      captureBtn.textContent = "Error";
+      btnText.textContent = "Error";
+      btnIcon.textContent = "✗";
       setTimeout(() => {
-        captureBtn.textContent = "Capture Now";
+        btnText.textContent = "Capture Now";
+        btnIcon.textContent = "⚡";
         captureBtn.disabled = false;
       }, 1500);
     }
