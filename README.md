@@ -48,9 +48,12 @@ npm run dev
 
 ## Architecture
 ```
-cos-ai-core/         → Context capture, embedding pipeline, voice, drift detection
-cos-backend/          → FastAPI + FAISS + SQLite
-cos-desktop-ui/       → React + Vite + Tailwind
+NEWCOS/
+├── cos-ai-core/          # Python daemon — capture, embed, voice, graph
+├── cos-backend/          # FastAPI — FAISS, SQLite, recall engine
+├── cos-desktop-ui/       # React + Vite — Home, Ask, Timeline, Focus
+├── cos-extension/        # Chrome Manifest V3 — browser context capture
+└── README.md
 ```
 
 ## Stack
@@ -63,3 +66,28 @@ cos-desktop-ui/       → React + Vite + Tailwind
 - **Frontend**: React 18 + Vite + Tailwind CSS
 
 Fully local · Fully offline · Zero cost · Zero API keys.
+
+---
+
+## 🧩 Chrome Extension Setup
+
+### Load in Chrome
+1. Open Chrome → go to `chrome://extensions`
+2. Enable **Developer Mode** (top right toggle)
+3. Click **Load unpacked**
+4. Select `C:\Users\kakka\OneDrive\Desktop\NEWCOS\cos-extension\`
+5. Pin the COS extension to your toolbar
+
+### What it captures
+- Active tab URL + title (every 30 seconds)
+- Visible page text — headings, paragraphs, meta description
+- Time spent on each tab
+- Sends everything to COS backend at http://localhost:8000/memory
+
+### Offline behaviour
+- If backend is down, snapshots queue locally (max 50)
+- Queue flushes automatically when backend comes back online
+
+### Demo tip
+- Open the extension popup during demo to show live capture status
+- Green dot = backend connected = judges see it working in real time
