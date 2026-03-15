@@ -11,14 +11,9 @@ const API = ''
 const FocusBar = ({ score }) => {
   const filled = Math.round((score || 0) / 20)
   return (
-    <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+    <div className="flex gap-1 items-center">
       {[1, 2, 3, 4, 5].map(i => (
-        <div key={i} style={{
-          width: '12px', height: '12px',
-          borderRadius: '2px',
-          background: i <= filled ? '#6366f1' : '#2a2a2a',
-          transition: 'background 0.3s ease',
-        }} />
+        <div key={i} className={`w-3 h-3 rounded-[2px] transition-colors duration-300 ${i <= filled ? 'bg-cos-primary' : 'bg-white/5'}`} />
       ))}
     </div>
   )
@@ -26,45 +21,28 @@ const FocusBar = ({ score }) => {
 
 // ─── Status badge ───────────────────────────────────────────────────────
 const StatusBadge = ({ status, emoji, color }) => {
-  const bg = color === 'green' ? 'rgba(20,184,166,0.15)' :
-             color === 'yellow' ? 'rgba(234,179,8,0.15)' :
-             color === 'red' ? 'rgba(239,68,68,0.15)' : 'rgba(100,100,100,0.15)'
-  const fg = color === 'green' ? '#14b8a6' :
-             color === 'yellow' ? '#eab308' :
-             color === 'red' ? '#ef4444' : '#a1a1aa'
+  let badgeClasses = 'bg-zinc-800 text-zinc-400 border-zinc-700'
+  if (color === 'green') badgeClasses = 'bg-teal-500/10 text-teal-400 border-teal-500/20'
+  else if (color === 'yellow') badgeClasses = 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+  else if (color === 'red') badgeClasses = 'bg-red-500/10 text-red-500 border-red-500/20'
+
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: '6px',
-      padding: '4px 10px', borderRadius: '20px',
-      background: bg, color: fg,
-      fontSize: '12px', fontWeight: 600,
-      whiteSpace: 'nowrap',
-    }}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeClasses} whitespace-nowrap`}>
       {emoji} {status}
     </span>
   )
 }
 
 // ─── Summary card ───────────────────────────────────────────────────────
-const SummaryCard = ({ title, value, subtitle, accent }) => (
-  <div style={{
-    flex: 1, minWidth: '180px',
-    background: '#111111',
-    border: '1px solid #1e1e1e',
-    borderRadius: '12px',
-    padding: '20px',
-    transition: 'border-color 0.3s',
-  }}
-    onMouseEnter={e => e.currentTarget.style.borderColor = accent || '#6366f1'}
-    onMouseLeave={e => e.currentTarget.style.borderColor = '#1e1e1e'}
-  >
-    <div style={{ color: '#a1a1aa', fontSize: '12px', fontWeight: 500, letterSpacing: '0.05em', marginBottom: '8px', textTransform: 'uppercase' }}>
+const SummaryCard = ({ title, value, subtitle, accentClass }) => (
+  <div className={`flex-1 min-w-[180px] bg-cos-card border border-cos-border rounded-xl p-5 transition-colors duration-300 hover:border-cos-primary/50 group`}>
+    <div className="text-cos-muted text-xs font-bold tracking-wider uppercase mb-2 group-hover:text-white transition-colors">
       {title}
     </div>
-    <div style={{ color: '#ffffff', fontSize: '28px', fontWeight: 700, marginBottom: '4px' }}>
+    <div className="text-3xl font-extrabold text-white mb-1">
       {value}
     </div>
-    <div style={{ color: '#6b7280', fontSize: '12px' }}>
+    <div className={`text-xs font-medium ${accentClass || 'text-cos-muted'}`}>
       {subtitle}
     </div>
   </div>
@@ -72,18 +50,12 @@ const SummaryCard = ({ title, value, subtitle, accent }) => (
 
 // ─── Report panel ───────────────────────────────────────────────────────
 const ReportPanel = ({ report, loading }) => {
-  if (loading) return <div style={{ color: '#a1a1aa', padding: '24px', textAlign: 'center' }}>Loading report…</div>
-  if (!report) return <div style={{ color: '#6b7280', padding: '24px', textAlign: 'center' }}>Select a report tab above</div>
+  if (loading) return <div className="text-cos-muted p-8 text-center text-sm font-medium animate-pulse">Generating cognitive report...</div>
+  if (!report) return <div className="text-cos-muted p-8 text-center text-sm">Select a report criteria to generate insights.</div>
 
   return (
-    <div style={{
-      background: '#111111', border: '1px solid #1e1e1e', borderRadius: '12px',
-      padding: '24px', marginTop: '16px', lineHeight: 1.8,
-    }}>
-      <pre style={{
-        color: '#e5e5e5', fontFamily: "'Outfit', monospace", fontSize: '13px',
-        whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0,
-      }}>
+    <div className="bg-[#0f0f11] border border-cos-border rounded-xl p-6 mt-4 shadow-inner">
+      <pre className="text-zinc-300 text-xs font-mono whitespace-pre-wrap break-words leading-relaxed">
         {JSON.stringify(report, null, 2)}
       </pre>
     </div>
@@ -250,10 +222,10 @@ export default function WorkSense() {
   // ─── Row background ───────────────────────────────────────────────
   const rowBg = (status) => {
     const s = (status || '').toLowerCase()
-    if (s === 'deep focus' || s === 'focused') return 'rgba(20,184,166,0.05)'
-    if (s === 'distracted') return 'rgba(234,179,8,0.05)'
-    if (s === 'off task' || s === 'idle') return 'rgba(239,68,68,0.05)'
-    return 'transparent'
+    if (s === 'deep focus' || s === 'focused') return 'bg-teal-500/5 hover:bg-teal-500/10'
+    if (s === 'distracted') return 'bg-amber-500/5 hover:bg-amber-500/10'
+    if (s === 'off task' || s === 'idle') return 'bg-red-500/5 hover:bg-red-500/10'
+    return 'hover:bg-white/5'
   }
 
   // ═════════════════════════════════════════════════════════════════════
@@ -261,69 +233,47 @@ export default function WorkSense() {
   // ═════════════════════════════════════════════════════════════════════
   if (!isAuthed) {
     return (
-      <div style={{
-        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: '#0a0a0a', fontFamily: "'Outfit', sans-serif",
-      }}>
-        <div style={{
-          width: '380px', background: '#111111', border: '1px solid #1e1e1e',
-          borderRadius: '16px', padding: '40px',
-        }}>
-          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <div style={{ fontSize: '28px', marginBottom: '8px' }}>🧠</div>
-            <h1 style={{ color: '#ffffff', fontSize: '20px', fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>
-              COS WorkSense
-            </h1>
-            <p style={{ color: '#6b7280', fontSize: '13px', margin: '8px 0 0' }}>
-              Manager Dashboard Login
-            </p>
+      <div className="min-h-screen flex items-center justify-center bg-cos-bg font-sans px-4">
+        <div className="w-full max-w-sm bg-cos-card border border-cos-border rounded-xl p-8 shadow-2xl relative overflow-hidden">
+          
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cos-primary to-teal-400" />
+
+          <div className="text-center mb-8">
+            <div className="text-3xl mb-3 drop-shadow-[0_0_15px_rgba(99,102,241,0.5)]">🧠</div>
+            <h1 className="text-white text-xl font-bold tracking-tight">COS WorkSense</h1>
+            <p className="text-cos-muted text-xs font-medium mt-1">Manager Dashboard Login</p>
           </div>
 
-          <form onSubmit={handleLogin}>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ color: '#a1a1aa', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Email</label>
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div>
+              <label className="block text-cos-muted text-xs font-bold uppercase tracking-wider mb-2">Email</label>
               <input
                 type="email"
                 value={loginEmail}
                 onChange={e => setLoginEmail(e.target.value)}
                 placeholder="manager@company.com"
-                style={{
-                  width: '100%', padding: '10px 14px', background: '#0a0a0a',
-                  border: '1px solid #2a2a2a', borderRadius: '8px', color: '#fff',
-                  fontSize: '14px', outline: 'none', boxSizing: 'border-box',
-                }}
+                className="w-full bg-[#09090b] border border-cos-border text-white text-sm rounded-lg px-4 py-3 outline-none focus:border-cos-primary focus:ring-1 focus:ring-cos-primary transition-all placeholder:text-zinc-600"
                 required
               />
             </div>
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ color: '#a1a1aa', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Password</label>
+            <div>
+              <label className="block text-cos-muted text-xs font-bold uppercase tracking-wider mb-2">Password</label>
               <input
                 type="password"
                 value={loginPassword}
                 onChange={e => setLoginPassword(e.target.value)}
                 placeholder="••••••••"
-                style={{
-                  width: '100%', padding: '10px 14px', background: '#0a0a0a',
-                  border: '1px solid #2a2a2a', borderRadius: '8px', color: '#fff',
-                  fontSize: '14px', outline: 'none', boxSizing: 'border-box',
-                }}
+                className="w-full bg-[#09090b] border border-cos-border text-white text-sm rounded-lg px-4 py-3 outline-none focus:border-cos-primary focus:ring-1 focus:ring-cos-primary transition-all placeholder:text-zinc-600"
                 required
               />
             </div>
             {loginError && (
-              <div style={{ color: '#ef4444', fontSize: '13px', marginBottom: '16px', textAlign: 'center' }}>
+              <div className="text-red-400 text-xs font-medium text-center bg-red-500/10 py-2 rounded-md border border-red-500/20">
                 {loginError}
               </div>
             )}
-            <button type="submit" style={{
-              width: '100%', padding: '12px', background: '#6366f1', color: '#fff',
-              border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600,
-              cursor: 'pointer', transition: 'background 0.2s',
-            }}
-              onMouseEnter={e => e.currentTarget.style.background = '#4f46e5'}
-              onMouseLeave={e => e.currentTarget.style.background = '#6366f1'}
-            >
-              Sign In
+            <button type="submit" className="w-full bg-cos-primary hover:bg-cos-primaryHover text-white font-semibold text-sm py-3 rounded-lg transition-colors shadow-lg shadow-cos-primary/20">
+              Sign In to WorkSense
             </button>
           </form>
         </div>
@@ -340,193 +290,157 @@ export default function WorkSense() {
   const orgName = dashboard?.org_name || 'Organization'
 
   return (
-    <div style={{
-      minHeight: '100vh', background: '#0a0a0a',
-      fontFamily: "'Outfit', sans-serif", color: '#ffffff',
-      padding: '0 0 60px',
-    }}>
+    <div className="min-h-screen bg-cos-bg font-sans text-white pb-16">
 
       {/* ── SECTION A: Header ────────────────────────────────────────── */}
-      <header style={{
-        height: '80px', display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', padding: '0 32px',
-        borderBottom: '1px solid #1e1e1e',
-        background: 'linear-gradient(180deg, rgba(99,102,241,0.05) 0%, transparent 100%)',
-      }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '20px' }}>🧠</span>
-            <span style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '-0.02em' }}>COS WorkSense</span>
+      <header className="h-20 flex items-center justify-between px-8 border-b border-cos-border bg-cos-bg/80 backdrop-blur-md sticky top-0 z-40">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-cos-primary/10 border border-cos-primary/20 flex items-center justify-center text-cos-primary shadow-sm text-lg">
+            🧠
           </div>
-          <div style={{ color: '#6b7280', fontSize: '11px', marginTop: '2px', marginLeft: '30px' }}>
-            Cognitive Workforce Intelligence
+          <div>
+            <h1 className="text-lg font-bold tracking-tight">COS WorkSense</h1>
+            <p className="text-[10px] text-cos-muted font-bold uppercase tracking-widest text-cos-primary/80">Cognitive Workforce</p>
           </div>
         </div>
-        <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '24px' }}>
-          <div>
-            <div style={{ color: '#e5e5e5', fontSize: '14px', fontWeight: 500 }}>
-              {orgName} · <span style={{ color: '#6366f1' }}>{totalOnline}</span> employees online
+        <div className="flex items-center gap-8">
+          <div className="text-right hidden sm:block">
+            <div className="text-sm font-semibold text-white">
+              {orgName} · <span className="text-cos-primary">{totalOnline}</span> online
             </div>
-            <div style={{ color: '#6b7280', fontSize: '11px', marginTop: '2px' }}>
-              Last updated: {timeSince} ·{' '}
-              <span style={{ color: live ? '#14b8a6' : '#ef4444' }}>
-                {live ? '🟢 Live' : '🔴 Offline'}
+            <div className="text-[11px] text-cos-muted font-medium mt-0.5 flex items-center justify-end gap-1.5">
+              Updated {timeSince} ·
+              <span className={`flex items-center gap-1 ${live ? 'text-teal-400' : 'text-red-500'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${live ? 'bg-teal-400 animate-pulse' : 'bg-red-500'}`} />
+                {live ? 'Live' : 'Offline'}
               </span>
             </div>
           </div>
-          <button onClick={handleLogout} style={{
-            padding: '6px 14px', background: 'transparent', border: '1px solid #2a2a2a',
-            borderRadius: '6px', color: '#a1a1aa', fontSize: '12px', cursor: 'pointer',
-          }}>
-            Logout
+          <button onClick={handleLogout} className="text-xs font-semibold text-cos-muted hover:text-white transition-colors border border-cos-border hover:border-cos-muted/50 px-3 py-1.5 rounded-lg">
+            Sign out
           </button>
         </div>
       </header>
 
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 32px' }}>
+      <div className="max-w-7xl mx-auto px-6 pt-10">
 
         {/* ── SECTION B: Summary Cards ─────────────────────────────────── */}
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '32px', flexWrap: 'wrap' }}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <SummaryCard
             title="Team Score"
-            value={`${teamScore} / 100`}
-            subtitle={teamScore >= 70 ? '↑ Above target' : teamScore >= 50 ? '→ Near target' : '↓ Below target'}
-            accent="#6366f1"
+            value={`${teamScore}/100`}
+            subtitle={teamScore >= 70 ? '↑ Exceeding targets' : teamScore >= 50 ? '→ Stabilized' : '↓ Attention required'}
+            accentClass={teamScore >= 70 ? 'text-teal-400' : teamScore >= 50 ? 'text-amber-500' : 'text-red-500'}
           />
           <SummaryCard
             title="Deep Focus"
             value={`${(summary.deep_focus_count || 0) + (summary.focused_count || 0)}`}
-            subtitle={`${totalOnline > 0 ? Math.round(((summary.deep_focus_count || 0) + (summary.focused_count || 0)) / totalOnline * 100) : 0}% of team`}
-            accent="#14b8a6"
+            subtitle={`${totalOnline > 0 ? Math.round(((summary.deep_focus_count || 0) + (summary.focused_count || 0)) / totalOnline * 100) : 0}% capacity utilization`}
+            accentClass="text-teal-400"
           />
           <SummaryCard
             title="Distracted"
             value={`${summary.distracted_count || 0}`}
-            subtitle={`${totalOnline > 0 ? Math.round((summary.distracted_count || 0) / totalOnline * 100) : 0}% of team`}
-            accent="#eab308"
+            subtitle={`${totalOnline > 0 ? Math.round((summary.distracted_count || 0) / totalOnline * 100) : 0}% capacity blocked`}
+            accentClass="text-amber-500"
           />
           <SummaryCard
             title="Off Task"
             value={`${(summary.off_task_count || 0) + (summary.idle_count || 0)}`}
-            subtitle={`${totalOnline > 0 ? Math.round(((summary.off_task_count || 0) + (summary.idle_count || 0)) / totalOnline * 100) : 0}% of team`}
-            accent="#ef4444"
+            subtitle={`${totalOnline > 0 ? Math.round(((summary.off_task_count || 0) + (summary.idle_count || 0)) / totalOnline * 100) : 0}% capacity idle`}
+            accentClass="text-red-500"
           />
         </div>
 
         {/* ── SECTION C: Employee Table ────────────────────────────────── */}
-        <div style={{
-          background: '#111111', border: '1px solid #1e1e1e',
-          borderRadius: '12px', overflow: 'hidden', marginBottom: '32px',
-        }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid #1e1e1e' }}>
-            <span style={{ fontWeight: 600, fontSize: '14px' }}>Team Activity</span>
-            <span style={{ color: '#6b7280', fontSize: '12px', marginLeft: '12px' }}>
-              {employees.length} employees
-            </span>
+        <div className="bg-cos-card border border-cos-border rounded-xl overflow-hidden mb-8 shadow-sm">
+          <div className="px-6 py-4 border-b border-cos-border flex justify-between items-center bg-[#131315]">
+            <h3 className="text-sm font-bold text-white">Live Operations Grid</h3>
+            <span className="text-xs font-medium text-cos-muted bg-white/5 px-2.5 py-1 rounded-full">{employees.length} Active Nodes</span>
           </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid #1e1e1e' }}>
-                {['Employee', 'Current Context', 'Focus', 'Switches', 'Session', 'Status', 'Action'].map(h => (
-                  <th key={h} style={{
-                    padding: '12px 16px', textAlign: 'left',
-                    color: '#6b7280', fontSize: '11px', fontWeight: 600,
-                    textTransform: 'uppercase', letterSpacing: '0.06em',
-                  }}>
-                    {h}
-                  </th>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-[#0f0f11] border-b border-cos-border">
+                  {['Employee', 'Current Context', 'Cognitive Focus', 'Switches', 'Session', 'Status', 'Action'].map(h => (
+                    <th key={h} className="px-6 py-3 text-[10px] font-bold text-cos-muted uppercase tracking-wider">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-cos-border">
+                {employees.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center text-sm font-medium text-cos-muted bg-[#0f0f11]">
+                      Org grid empty. Provision employees via the API console.
+                    </td>
+                  </tr>
+                )}
+                {employees.map(emp => (
+                  <tr key={emp.emp_id} className={`${rowBg(emp.status)} transition-colors duration-200`}>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-bold text-white">{emp.emp_code}</div>
+                      <div className="text-[11px] font-medium text-cos-muted mt-0.5">{emp.name}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-zinc-200 max-w-[240px] truncate" title={`${emp.current_app} — ${emp.current_title}`}>
+                        {emp.current_title || 'Idle'}
+                      </div>
+                      <div className="text-[10px] font-bold text-cos-primary uppercase tracking-widest mt-1">
+                        {emp.current_app || '--'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <span className={`text-sm font-bold w-6 ${emp.focus_score >= 70 ? 'text-teal-400' : emp.focus_score >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+                          {emp.focus_score}
+                        </span>
+                        <FocusBar score={emp.focus_score} />
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-zinc-200">{emp.context_switches} <span className="text-xs text-cos-muted">/hr</span></div>
+                      <div className="text-[10px] font-semibold text-cos-muted mt-0.5 uppercase tracking-wider">{emp.switch_label}</div>
+                    </td>
+                    <td className="px-6 py-4 text-xs font-mono text-cos-muted">
+                      {emp.session_str || '--:--:--'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <StatusBadge status={emp.status} emoji={emp.status_emoji} color={emp.status_color} />
+                    </td>
+                    <td className="px-6 py-4">
+                      <button className={`px-3 py-1.5 rounded-md text-[11px] font-bold uppercase tracking-wider border transition-all ${emp.status_color === 'red' || emp.status_color === 'yellow' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500/20' : 'bg-cos-primary/10 text-cos-primary border-cos-primary/30 hover:bg-cos-primary/20'}`}>
+                        {emp.status_color === 'red' || emp.status_color === 'yellow' ? 'Intervene' : 'Audit'}
+                      </button>
+                    </td>
+                  </tr>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {employees.length === 0 && (
-                <tr>
-                  <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#6b7280', fontSize: '13px' }}>
-                    No employees registered yet. Create an org via the API to get started.
-                  </td>
-                </tr>
-              )}
-              {employees.map(emp => (
-                <tr key={emp.emp_id} style={{
-                  background: rowBg(emp.status),
-                  borderBottom: '1px solid #1e1e1e',
-                  transition: 'background 0.3s',
-                }}>
-                  {/* Employee */}
-                  <td style={{ padding: '14px 16px' }}>
-                    <div style={{ fontWeight: 600, fontSize: '13px', color: '#e5e5e5' }}>{emp.emp_code}</div>
-                    <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{emp.name}</div>
-                  </td>
-                  {/* Current Context */}
-                  <td style={{ padding: '14px 16px' }}>
-                    <div style={{ fontSize: '13px', color: '#e5e5e5', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {emp.current_app} — {emp.current_title}
-                    </div>
-                  </td>
-                  {/* Focus */}
-                  <td style={{ padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: emp.focus_score >= 70 ? '#14b8a6' : emp.focus_score >= 50 ? '#eab308' : '#ef4444' }}>
-                        {emp.focus_score}
-                      </span>
-                      <FocusBar score={emp.focus_score} />
-                    </div>
-                  </td>
-                  {/* Switches */}
-                  <td style={{ padding: '14px 16px' }}>
-                    <span style={{ fontSize: '13px', color: '#e5e5e5' }}>{emp.context_switches}</span>
-                    <span style={{ fontSize: '11px', color: '#6b7280', marginLeft: '4px' }}>{emp.switch_label}</span>
-                  </td>
-                  {/* Session */}
-                  <td style={{ padding: '14px 16px', fontSize: '13px', color: '#a1a1aa' }}>
-                    {emp.session_str || '--'}
-                  </td>
-                  {/* Status */}
-                  <td style={{ padding: '14px 16px' }}>
-                    <StatusBadge status={emp.status} emoji={emp.status_emoji} color={emp.status_color} />
-                  </td>
-                  {/* Action */}
-                  <td style={{ padding: '14px 16px' }}>
-                    <button style={{
-                      padding: '5px 12px', background: 'transparent',
-                      border: '1px solid #2a2a2a', borderRadius: '6px',
-                      color: emp.status_color === 'red' || emp.status_color === 'yellow' ? '#eab308' : '#6366f1',
-                      fontSize: '11px', cursor: 'pointer', fontWeight: 500,
-                    }}>
-                      {emp.status_color === 'red' || emp.status_color === 'yellow' ? 'Alert' : 'View'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* ── SECTION D: Report Tabs ───────────────────────────────────── */}
-        <div>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '4px' }}>
-            {['hourly', 'daily', 'weekly'].map(type => (
-              <button
-                key={type}
-                onClick={() => fetchReport(type)}
-                style={{
-                  padding: '8px 20px',
-                  background: activeReport === type ? '#6366f1' : '#111111',
-                  border: `1px solid ${activeReport === type ? '#6366f1' : '#2a2a2a'}`,
-                  borderRadius: '8px',
-                  color: activeReport === type ? '#fff' : '#a1a1aa',
-                  fontSize: '13px', fontWeight: 500, cursor: 'pointer',
-                  textTransform: 'capitalize',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {type}
-              </button>
-            ))}
+        <div className="bg-cos-card border border-cos-border rounded-xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-white">Automated Insight Reports</h3>
+            <div className="flex bg-[#0f0f11] border border-cos-border rounded-lg p-1">
+              {['hourly', 'daily', 'weekly'].map(type => (
+                <button
+                  key={type}
+                  onClick={() => fetchReport(type)}
+                  className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors ${activeReport === type ? 'bg-cos-primary text-white shadow-sm' : 'text-cos-muted hover:text-white'}`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
           </div>
           <ReportPanel report={reportData} loading={reportLoading} />
         </div>
+
       </div>
     </div>
   )

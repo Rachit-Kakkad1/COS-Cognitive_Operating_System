@@ -1,233 +1,185 @@
-import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
-import { BrainLogo, SearchIcon, WifiIcon, AppIcon, ClockIcon, BoltIcon } from '../../components/Icons'
-import { useMode } from '../../context/ModeContext'
-
-const API = '/api'
-const MODE_API = '/mode'
-
-function ThinkingDots() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <BrainLogo size={20} animated={false} />
-      <span style={{ color: '#6366f1', fontSize: 14, fontWeight: 500 }}>System processing</span>
-      {[0, 1, 2].map(i => (
-        <span key={i} style={{
-          display: 'inline-block', width: 6, height: 6,
-          background: '#6366f1', borderRadius: '50%',
-          animation: `dotBlink 1.2s ease-in-out infinite`,
-          animationDelay: `${i * 0.22}s`,
-        }} />
-      ))}
-    </div>
-  )
-}
-
-function useTypewriter(text, speed = 45) {
-  const [displayed, setDisplayed] = useState('')
-  const [done, setDone] = useState(false)
-  useEffect(() => {
-    setDisplayed('')
-    setDone(false)
-    let i = 0
-    const interval = setInterval(() => {
-      if (i < text.length) {
-        setDisplayed(text.slice(0, i + 1))
-        i++
-      } else {
-        setDone(true)
-        clearInterval(interval)
-      }
-    }, speed)
-    return () => clearInterval(interval)
-  }, [text, speed])
-  return { displayed, done }
-}
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { GlobalStyles } from '../../components/ui/GlobalStyles';
+import { Sidebar } from '../../components/ui/Sidebar';
+import { TopBar } from '../../components/ui/TopBar';
+import { StatCard } from '../../components/ui/StatCard';
+import { Card } from '../../components/ui/Card';
+import { Badge } from '../../components/ui/Badge';
+import { StatusDot } from '../../components/ui/StatusDot';
+import { C, S, F, R } from '../../design/tokens';
 
 export default function ProfessionalHome() {
-  const { currentMode } = useMode()
-  const c = currentMode.colors
-
-  const [query, setQuery] = useState('')
-  const [result, setResult] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [health, setHealth] = useState(null)
-  
-  // Professional specific states
-  const [sessionTime, setSessionTime] = useState(0)
-  const [burnoutDetected, setBurnoutDetected] = useState(true) // Mock detection
-  const cognitiveScore = 88 // Mock score
-
-  const inputRef = useRef(null)
-  const { displayed: tagline, done: taglineDone } = useTypewriter('Cognitive workspace active.', 55)
+  const navigate = useNavigate();
+  const [time, setTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+  const [lastCap, setLastCap] = useState(2);
 
   useEffect(() => {
-    fetch(`${API}/health`).then(r => r.json()).then(setHealth).catch(() => {})
-    
-    // Track session time for break reminder (accelerated for demo: 1 real second = 1 min)
-    const int = setInterval(() => {
-      setSessionTime(prev => prev + 1)
-    }, 60000)
-    return () => clearInterval(int)
-  }, [])
+    const t = setInterval(() => {
+      setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    }, 10000);
+    const lc = setInterval(() => {
+      setLastCap(prev => prev < 5 ? prev + 1 : 1);
+    }, 60000);
+    return () => { clearInterval(t); clearInterval(lc); };
+  }, []);
 
-  const handleSearch = async (e) => {
-    e.preventDefault()
-    if (!query.trim()) return
-    setLoading(true); setResult(null)
-    try {
-      const res = await fetch(`${MODE_API}/recall?query=${encodeURIComponent(query)}&k=1&mode=professional`)
-      const data = await res.json()
-      setResult(data.results?.[0] || { message: 'No relevant data found in short-term memory.', app: '', timestamp: '' })
-    } catch {
-      setResult({ message: 'API cluster unreachable. Verify daemon status.', app: '', timestamp: '' })
-    }
-    setLoading(false)
-  }
+  const NAV_ITEMS = [
+    { id: 'home',     label: 'Home',     icon: '🧠' },
+    { id: 'ask',      label: 'Ask COS',  icon: '🎤' },
+    { id: 'timeline', label: 'Timeline', icon: '📅' },
+    { id: 'graph',    label: 'Graph',    icon: '🕸️' },
+    { id: 'focus',    label: 'Focus',    icon: '📊' },
+    { id: 'system',   label: 'System',   icon: '⚡' },
+  ];
+
+  const SECONDARY_NAV = [
+    { id: 'settings', label: 'Settings', icon: '⚙️' },
+    { id: 'mode-select', label: 'Switch Mode', icon: '🔄' },
+  ];
+
+  const logo = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: F.lg, fontWeight: F.bold, color: C.textPrimary }}>
+      <span>🧠</span> COS
+    </div>
+  );
+
+  const topBarActions = (
+    <>
+      <Badge color={C.success} dot>Focus: 87</Badge>
+      <StatusDot status="online" />
+      <span style={{ fontSize: '16px', cursor: 'pointer', marginLeft: '8px' }}>☀️</span>
+    </>
+  );
+
+  // Recent memories mock data
+  const memories = [
+    { id: 1, app: 'Chrome', title: 'Stripe API Logs - Dashboard', time: '2m ago', color: '#4285f4' },
+    { id: 2, app: 'VS Code', title: 'backend/auth/fastapi_auth.py', time: '14m ago', color: '#007acc' },
+    { id: 3, app: 'Notion', title: 'Q3 Product Strategy - Draft', time: '1h ago', color: '#ffffff' },
+  ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 32, paddingTop: 12 }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: C.bg }}>
+      <GlobalStyles />
 
-      {/* Professional Header - Compact, info-dense */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: c.text, marginBottom: 4 }}>Workspace</h1>
-          <p style={{ fontSize: 13, color: c.textMuted, fontFamily: 'monospace' }}>
-            {tagline}
-            {!taglineDone && <span style={{ borderRight: `2px solid ${c.primary}`, animation: 'blink 0.8s infinite' }} />}
-          </p>
-        </div>
-        
-        {/* Daily Cognitive Score */}
-        <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 8, padding: '10px 16px', textAlign: 'center' }}>
-          <div style={{ fontSize: 11, color: c.textMuted, letterSpacing: '0.05em', marginBottom: 4 }}>COGNITIVE SCORE</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: c.primary }}>{cognitiveScore}</div>
-        </div>
-      </div>
+      <Sidebar 
+        items={[...NAV_ITEMS, {id: 'div', label: '─────────────', icon: ''}, ...SECONDARY_NAV]} 
+        active="home" 
+        onSelect={(id) => {
+          if(id === 'div') return;
+          navigate(`/${id}`);
+        }} 
+        logo={logo} 
+        accent={C.purple} 
+      />
 
-      {/* Burnout Warning Banner */}
-      {burnoutDetected && (
-        <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: `1px solid ${c.accent}`, borderRadius: 8, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <span style={{ fontSize: 18 }}>⚠️</span>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: c.accent }}>Pattern Anomaly Detected: Elevated Context Switching</div>
-              <div style={{ fontSize: 12, color: c.textMuted }}>Metrics show a 40% drop in focus efficiency over the last 3 hours.</div>
+      <div style={{ marginLeft: '220px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <TopBar 
+          title={`Good morning, ${time}`} 
+          actions={topBarActions} 
+          accent={C.purple} 
+        />
+
+        <main style={{ padding: '28px 32px', animation: 'fadeIn 0.25s ease', flex: 1, display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          
+          {/* ZONE 1 - Top Stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+            <StatCard label="Memories Today" value="47"          icon="🧠" accent={C.purple} />
+            <StatCard label="Focus Score"    value="87"          icon="📊" accent={C.success} trend="↑+12" />
+            <StatCard label="Deep Focus"     value="2h 14m"      icon="⏱️" accent={C.teal} />
+            <StatCard label="Context Switch" value="8"           icon="🔄" accent={C.amber} />
+          </div>
+
+          {/* ZONE 2 - Memories and Quick Actions */}
+          <div style={{ display: 'flex', gap: '32px' }}>
+            
+            {/* Recent Memories (60%) */}
+            <div style={{ flex: '6' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: F.md, fontWeight: F.semibold, color: C.textPrimary }}>Recent Memories</h3>
+                <span onClick={() => navigate('/timeline')} style={{ fontSize: F.xs, color: C.purple, cursor: 'pointer', fontWeight: F.semibold }}>View all →</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {memories.map(m => (
+                  <Card key={m.id} padding="16px" radius="10px" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: `3px solid ${m.color}`, cursor: 'pointer' }}
+                    onClick={() => navigate('/timeline')}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: m.color }} />
+                      <Badge color={m.color}>{m.app}</Badge>
+                      <span style={{ fontSize: F.sm, fontWeight: F.semibold, color: C.textPrimary }}>{m.title}</span>
+                    </div>
+                    <span style={{ fontSize: F.xs, color: C.textSecondary }}>{m.time}</span>
+                  </Card>
+                ))}
+              </div>
             </div>
-          </div>
-          <button onClick={() => setBurnoutDetected(false)} style={{ background: 'transparent', border: `1px solid ${c.accent}`, color: c.accent, padding: '6px 12px', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Acknowledge</button>
-        </div>
-      )}
 
-      {/* Break Reminder */}
-      {sessionTime >= 90 && (
-        <div style={{ background: 'rgba(99, 102, 241, 0.1)', border: `1px solid ${c.primary}`, borderRadius: 8, padding: '12px 16px', display: 'flex', gap: 12, alignItems: 'center' }}>
-          <span style={{ fontSize: 18 }}>☕</span>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: c.primary }}>Continuous Operation: 90 Minutes</div>
-            <div style={{ fontSize: 12, color: c.textMuted }}>Optimal cognitive performance requires a 10-minute system reset.</div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Search Bar ── */}
-      <form onSubmit={handleSearch} style={{ display: 'flex', gap: 10 }}>
-        <div style={{ flex: 1, position: 'relative' }}>
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Query cognitive database (e.g. 'auth middleware error')"
-            style={{
-              width: '100%', borderRadius: 8,
-              padding: '14px 20px',
-              fontSize: 14, background: c.surface,
-              color: c.text, border: `1px solid ${c.border}`,
-              outline: 'none', fontFamily: 'monospace'
-            }}
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={loading}
-          style={{ 
-            borderRadius: 8, padding: '14px 28px', fontSize: 13, fontWeight: 600,
-            background: c.primary, color: '#fff', border: 'none', cursor: 'pointer',
-            opacity: loading ? 0.6 : 1, fontFamily: 'monospace'
-          }}
-        >
-          EXECUTE
-        </button>
-      </form>
-
-      {/* ── Loading ── */}
-      {loading && (
-        <div style={{ padding: '16px 0' }}>
-          <ThinkingDots />
-        </div>
-      )}
-
-      {/* ── Result Card ── */}
-      {result && !loading && (
-        <div style={{
-            background: c.surface, borderRadius: 12, padding: '20px',
-            borderLeft: `4px solid ${c.primary}`, border: `1px solid ${c.border}`
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <p style={{ color: c.text, fontSize: 14, fontWeight: 500, lineHeight: 1.5 }}>
-                {result.message || result.summary}
-              </p>
-              {result.app && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-                  <span style={{ fontSize: 11, background: c.bg, padding: '2px 8px', borderRadius: 4, border: `1px solid ${c.border}`, color: c.textMuted }}>{result.app}</span>
+            {/* Quick Actions (40%) */}
+            <div style={{ flex: '4' }}>
+              <h3 style={{ fontSize: F.md, fontWeight: F.semibold, color: C.textPrimary, marginBottom: '16px' }}>Quick Actions</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repaet(2, 1fr)', gap: '12px' }}>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <Card style={{ flex: 1, padding: '20px' }} onClick={() => navigate('/ask')} glow accent={C.purple}>
+                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>🎤</div>
+                    <div style={{ fontSize: F.sm, fontWeight: F.semibold, color: C.textPrimary }}>Ask COS <span style={{color: C.textSecondary}}>→</span></div>
+                  </Card>
+                  <Card style={{ flex: 1, padding: '20px' }} onClick={() => navigate('/focus')} glow accent={C.teal}>
+                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>📊</div>
+                    <div style={{ fontSize: F.sm, fontWeight: F.semibold, color: C.textPrimary }}>Focus Report <span style={{color: C.textSecondary}}>→</span></div>
+                  </Card>
                 </div>
-              )}
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <Card style={{ flex: 1, padding: '20px' }} onClick={() => navigate('/graph')} glow accent="#8b5cf6">
+                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>🕸️</div>
+                    <div style={{ fontSize: F.sm, fontWeight: F.semibold, color: C.textPrimary }}>View Graph <span style={{color: C.textSecondary}}>→</span></div>
+                  </Card>
+                  <Card style={{ flex: 1, padding: '20px' }} onClick={() => navigate('/system')} glow accent={C.amber}>
+                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>⚡</div>
+                    <div style={{ fontSize: F.sm, fontWeight: F.semibold, color: C.textPrimary }}>System Health <span style={{color: C.textSecondary}}>→</span></div>
+                  </Card>
+                </div>
+              </div>
             </div>
-            {result.timestamp && (
-              <span style={{ color: c.textMuted, fontSize: 11, fontFamily: 'monospace' }}>{result.timestamp}</span>
-            )}
+            
           </div>
 
-          {(result.cta || result.url) && (
-             <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${c.border}` }}>
-              <button
-                onClick={async () => {
-                  if (result.url) window.open(result.url, '_blank')
-                }}
-                style={{
-                  background: 'transparent',
-                  border: `1px solid ${c.primary}`,
-                  borderRadius: 6, padding: '8px 16px',
-                  color: c.primary, fontSize: 12, fontWeight: 600,
-                  cursor: 'pointer', fontFamily: 'inherit',
-                }}
-              >
-                {result.cta || "Initialize Context"}
-              </button>
+          {/* ZONE 3 - Today's Summary */}
+          <div style={{ background: C.bgActive, borderRadius: R.md, padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontSize: F.sm, color: C.textPrimary, fontWeight: F.medium }}>
+              Today: 47 memories · 2h 14m deep focus · 8 switches
             </div>
-          )}
-        </div>
-      )}
+            <div style={{ fontSize: F.xs, color: C.textSecondary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              Last captured: {lastCap} min ago <StatusDot status="online" />
+            </div>
+          </div>
 
-      {/* ── System Status ── */}
-      {!result && !loading && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-          {[
-            { label: 'Latency', val: '12ms', color: '#10b981' },
-            { label: 'Memories', val: health?.memories ?? 0, color: c.text },
-            { label: 'Daemon', val: 'Active', color: '#10b981' },
-            { label: 'Vector Store', val: 'Synced', color: '#10b981' },
-          ].map((item, i) => (
-             <div key={i} style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 8, padding: '16px', textAlign: 'center' }}>
-               <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{item.label}</div>
-               <div style={{ fontSize: 16, fontWeight: 500, color: item.color, fontFamily: 'monospace' }}>{item.val}</div>
-             </div>
-          ))}
-        </div>
-      )}
+          {/* ZONE 4 - Mini Graph */}
+          <div style={{ flex: 1, position: 'relative', border: `1px solid ${C.border}`, borderRadius: R.md, background: '#0a0a14', minHeight: '300px', overflow: 'hidden' }}>
+            {/* FAKE COMPONENT for 3D Graph */}
+            <div style={{ position: 'absolute', inset: 0, opacity: 0.5, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: '12px' }}>
+               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '200px', height: '100px' }}>
+                 {/* Fake nodes */}
+                 <div style={{ position: 'absolute', top: '10%', left: '20%', width: 12, height: 12, background: C.purple, borderRadius: '50%', boxShadow: `0 0 10px ${C.purple}` }} />
+                 <div style={{ position: 'absolute', top: '80%', left: '40%', width: 16, height: 16, background: C.purple, borderRadius: '50%', boxShadow: `0 0 10px ${C.purple}` }} />
+                 <div style={{ position: 'absolute', top: '40%', left: '80%', width: 10, height: 10, background: C.purple, borderRadius: '50%', boxShadow: `0 0 10px ${C.purple}` }} />
+                 {/* Fake edges */}
+                 <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+                   <line x1="25%" y1="15%" x2="45%" y2="85%" stroke={C.teal} strokeWidth="2" opacity="0.6" />
+                   <line x1="45%" y1="85%" x2="82%" y2="45%" stroke={C.teal} strokeWidth="2" opacity="0.6" />
+                 </svg>
+               </div>
+               <span style={{ fontSize: F.sm, color: C.textMuted, fontFamily: F.mono }}>[WebGL Context Visualizer]</span>
+            </div>
+
+            <div style={{ position: 'absolute', bottom: '16px', right: '16px' }}>
+              <Button variant="ghost" onClick={() => navigate('/graph')}>View full graph →</Button>
+            </div>
+          </div>
+
+        </main>
+      </div>
     </div>
-  )
+  );
 }

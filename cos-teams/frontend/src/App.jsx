@@ -28,14 +28,14 @@ export default function App() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0f0f0f', color: '#fff', fontFamily: "'Outfit', sans-serif" }}>
-      {token && <TeamBanner />}
-      <main style={{ paddingBottom: 80 }}>
+    <div style={{ minHeight: '100vh', background: '#080810', color: '#f0f0ff', fontFamily: '-apple-system, Inter, sans-serif' }}>
+      <main>
         <Routes>
           <Route path="/" element={token ? <Navigate to="/home" replace /> : <TeamSetup />} />
           <Route path="/setup" element={<TeamSetup />} />
           <Route path="/home" element={<Home />} />
           <Route path="/team" element={<TeamDashboard />} />
+          <Route path="/dashboard" element={<TeamDashboard />} />
           <Route path="/cofounder/:id" element={<CoFounderView />} />
           <Route path="/handoff" element={<HandoffPage />} />
           <Route path="/report" element={<WeeklyReport />} />
@@ -44,20 +44,6 @@ export default function App() {
         </Routes>
       </main>
       <TabGuardian />
-      {token && (
-        <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'rgba(15,15,15,0.95)', borderTop: '1px solid #2a2a2a', display: 'flex', justifyContent: 'space-around', padding: '10px 0 12px', zIndex: 100 }}>
-          {NAV.map(({ to, label, icon }) => (
-            <NavLink key={to} to={to} style={{ textDecoration: 'none', color: '#a1a1aa', fontSize: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              {({ isActive }) => (
-                <>
-                  <span style={{ fontSize: 20 }}>{icon}</span>
-                  <span style={{ color: isActive ? '#f59e0b' : '#a1a1aa', fontWeight: isActive ? 600 : 400 }}>{label}</span>
-                </>
-              )}
-            </NavLink>
-          ))}
-        </nav>
-      )}
     </div>
   )
 }

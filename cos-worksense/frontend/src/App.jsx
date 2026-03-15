@@ -45,9 +45,8 @@ export default function App() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0f0f0f', color: '#fff', fontFamily: "'Outfit', sans-serif" }}>
-      {token && <WorkSenseBanner />}
-      <main style={{ paddingBottom: 80 }}>
+    <div style={{ minHeight: '100vh', background: '#080810', color: '#f0f0ff', fontFamily: '-apple-system, Inter, sans-serif' }}>
+      <main>
         <Routes>
           <Route path="/" element={token ? smartRedirect() : <Navigate to="/setup" replace />} />
           <Route path="/setup" element={<OrgSetup />} />
@@ -61,20 +60,6 @@ export default function App() {
         </Routes>
       </main>
       <TabGuardian />
-      {token && (
-        <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'rgba(15,15,15,0.95)', borderTop: '1px solid #1f2937', display: 'flex', justifyContent: 'space-around', padding: '10px 0 12px', zIndex: 100 }}>
-          {(isManager ? MANAGER_NAV : EMPLOYEE_NAV).map(({ to, label, icon }) => (
-            <NavLink key={to} to={to} style={{ textDecoration: 'none', color: '#9ca3af', fontSize: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              {({ isActive }) => (
-                <>
-                  <span style={{ fontSize: 20 }}>{icon}</span>
-                  <span style={{ color: isActive ? '#14b8a6' : '#9ca3af', fontWeight: isActive ? 600 : 400 }}>{label}</span>
-                </>
-              )}
-            </NavLink>
-          ))}
-        </nav>
-      )}
     </div>
   )
 }

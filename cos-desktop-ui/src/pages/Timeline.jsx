@@ -1,208 +1,183 @@
-// Timeline.jsx — Full space collapsible timeline
-// Sections: Today · Yesterday · Last Week ·
-//           Last Month · Last 2 Months · Last 6 Months
-// Fetches from GET /timeline (all buckets at once)
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { GlobalStyles } from '../components/ui/GlobalStyles';
+import { Sidebar } from '../components/ui/Sidebar';
+import { TopBar } from '../components/ui/TopBar';
+import { Input } from '../components/ui/Input';
+import { Card } from '../components/ui/Card';
+import { FocusBar } from '../components/ui/FocusBar';
+import { Badge } from '../components/ui/Badge';
+import { C, S, F, R } from '../design/tokens';
 
-import { useState, useEffect } from 'react'
-import { useTheme } from '../context/ThemeContext'
+export default function Timeline() {
+  const navigate = useNavigate();
+  const [search, setSearch] = useState('');
+  const [collapsed, setCollapsed] = useState({ 'Today': false, 'Yesterday': false, 'Older': true });
 
-const SECTIONS = [
-  { key: 'today',      label: 'Today',          icon: '📅' },
-  { key: 'yesterday',  label: 'Yesterday',      icon: '🕐' },
-  { key: 'last_week',  label: 'Last Week',      icon: '📆' },
-  { key: 'last_month', label: 'Last Month',      icon: '🗓️' },
-  { key: 'last_2mo',   label: 'Last 2 Months',  icon: '📊' },
-  { key: 'last_6mo',   label: 'Last 6 Months',  icon: '🗃️' },
-]
+  const NAV_ITEMS = [
+    { id: 'home',     label: 'Home',     icon: '🧠' },
+    { id: 'ask',      label: 'Ask COS',  icon: '🎤' },
+    { id: 'timeline', label: 'Timeline', icon: '📅' },
+    { id: 'graph',    label: 'Graph',    icon: '🕸️' },
+    { id: 'focus',    label: 'Focus',    icon: '📊' },
+    { id: 'system',   label: 'System',   icon: '⚡' },
+  ];
 
-// Show memory count in every section header — not just today
-// Example: "Today · 47 memories" or "Yesterday · 3 memories"
-// If count is 0: show "Yesterday · empty" in muted text
-const SectionHeader = ({ label, icon, count, expanded, onClick }) => (
-  <div onClick={onClick} style={{ cursor: 'pointer',
-    display: 'flex', justifyContent: 'space-between',
-    alignItems: 'center', padding: '16px 20px',
-    background: '#1a1a1a', borderRadius: expanded ? '12px 12px 0 0' : '12px',
-    border: '1px solid #2a2a2a' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-      <span style={{ fontSize: '20px' }}>{icon}</span>
-      <span style={{ color: '#fff', fontWeight: 500 }}>{label}</span>
-      <span style={{
-        background: count > 0 ? '#6366f122' : 'transparent',
-        border: `1px solid ${count > 0 ? '#6366f1' : '#2a2a2a'}`,
-        color: count > 0 ? '#6366f1' : '#a1a1aa',
-        borderRadius: '20px', padding: '2px 10px', fontSize: '12px'
-      }}>
-        {count > 0 ? `${count} memories` : 'empty'}
-      </span>
+  const logo = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: F.lg, fontWeight: F.bold, color: C.textPrimary }}>
+      <span>🧠</span> COS
     </div>
-    <span style={{ color: '#a1a1aa' }}>{expanded ? '▲' : '▼'}</span>
-  </div>
-)
+  );
 
-const Timeline = () => {
-  const { theme }             = useTheme()
-  const [sections, setSections] = useState({
-    today: [], yesterday: [], last_week: [],
-    last_month: [], last_2mo: [], last_6mo: []
-  })
-  const [open, setOpen]       = useState({ today: true })
-  const [loading, setLoading]  = useState(true)
+  const mockData = {
+    'Today': [
+      { id: 1, app: 'VS Code', title: 'React Performance Optimization', url: 'cos-desktop-ui/src/App.jsx', time: '10 mins ago', color: '#007acc', focus: 85, session: '42m' },
+      { id: 2, app: 'Chrome', title: 'Stripe API Reference', url: 'stripe.com/docs/api', time: '1 hr ago', color: '#4285f4', focus: 75, session: '12m' },
+      { id: 3, app: 'Slack', title: 'Engineering Channel - Deploy plan', url: 'slack.com/archives/...', time: '2 hrs ago', color: '#e01e5a', focus: 45, session: '8m' },
+    ],
+    'Yesterday': [
+      { id: 4, app: 'Figma', title: 'New Dashboard Iteration 3', url: 'figma.com/file/...', time: 'Yesterday, 4:30 PM', color: '#f24e1e', focus: 92, session: '1h 15m' },
+      { id: 5, app: 'Notion', title: 'Q3 OKRs Planning', url: 'notion.so/...', time: 'Yesterday, 2:00 PM', color: '#ffffff', focus: 88, session: '45m' },
+    ],
+    'Older': []
+  };
 
-  useEffect(() => {
-    const fetchTimeline = async () => {
-      try {
-        setLoading(true)
-        // Always call /timeline without params
-        const res  = await fetch('http://localhost:8000/timeline')
-        const data = await res.json()
-
-        // data should be { today: [], yesterday: [], ... }
-        // Handle both formats just in case
-        if (Array.isArray(data)) {
-          // Old format — put everything in today
-          setSections({ today: data, yesterday: [],
-                        last_week: [], last_month: [],
-                        last_2mo: [], last_6mo: [] })
-        } else {
-          setSections(data)
-        }
-      } catch (e) {
-        console.error('Timeline fetch failed:', e)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchTimeline()
-    const interval = setInterval(fetchTimeline, 30000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const toggleSection = (key) => {
-    setOpen(prev => ({ ...prev, [key]: !prev[key] }))
-  }
+  const toggleSection = (section) => {
+    setCollapsed(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   return (
-    <div style={{
-      padding: '24px',
-      maxWidth: '100%',
-      minHeight: '100vh',
-      background: theme.bg
-    }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: C.bg }}>
+      <GlobalStyles />
 
-      {/* Header */}
-      <div style={{ marginBottom:'32px' }}>
-        <span style={{ fontSize:'11px', color:'#6366f1',
-                       fontWeight:600, letterSpacing:'0.1em' }}>
-          COGNITIVE MEMORY
-        </span>
-        <h2 style={{ fontSize:'28px', color:theme.text,
-                     fontWeight:600, marginTop:'8px' }}>
-          Memory Timeline
-        </h2>
-        <p style={{ fontSize:'14px', color:theme.textMuted,
-                    marginTop:'4px' }}>
-          Your complete cognitive history — click any section to expand
-        </p>
-      </div>
+      <Sidebar 
+        items={NAV_ITEMS} 
+        active="timeline" 
+        onSelect={(id) => navigate(`/${id}`)} 
+        logo={logo} 
+        accent={C.purple} 
+      />
 
-      {loading ? (
-        <div style={{ padding:'32px', textAlign:'center',
-                      color:theme.textMuted, fontSize:'14px' }}>
-          Loading timeline...
-        </div>
-      ) : (
-        SECTIONS.map(({ key, label, icon }) => (
-          <div key={key} style={{ marginBottom:'8px' }}>
-            <SectionHeader
-              label={label}
-              icon={icon}
-              count={(sections[key] || []).length}
-              expanded={open[key]}
-              onClick={() => toggleSection(key)}
-            />
+      <div style={{ marginLeft: '220px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <TopBar 
+          title="Cognitive Timeline" 
+          subtitle="Your complete multi-modal historical memory"
+          accent={C.purple} 
+        />
 
-            {/* Section content — collapsible */}
-            {open[key] && (
-              <div style={{
-                border:       `1px solid ${theme.border}`,
-                borderTop:    'none',
-                borderRadius: '0 0 12px 12px',
-                padding:      '0',
-                overflow:     'hidden'
-              }}>
-                {!sections[key] || sections[key].length === 0 ? (
-                  <div style={{ padding:'32px', textAlign:'center',
-                                color:theme.textMuted, fontSize:'14px' }}>
-                    No memories for {label.toLowerCase()} yet
-                  </div>
-                ) : (
-                  (sections[key] || []).map((mem, i) => (
-                    <div key={mem.memory_id || i} style={{
-                      display:     'flex',
-                      alignItems:  'center',
-                      gap:         '16px',
-                      padding:     '16px 20px',
-                      borderBottom: i < sections[key].length - 1
-                        ? `1px solid ${theme.border}` : 'none',
-                      background:  i % 2 === 0
-                        ? theme.bgCard : theme.bg,
-                      transition:  '0.15s',
-                      cursor:      'default',
-                    }}
-                    onMouseEnter={e =>
-                      e.currentTarget.style.background = theme.bgInput
-                    }
-                    onMouseLeave={e =>
-                      e.currentTarget.style.background =
-                        i % 2 === 0 ? theme.bgCard : theme.bg
-                    }>
-
-                      {/* App icon dot */}
-                      <div style={{
-                        width:'10px', height:'10px',
-                        borderRadius:'50%', flexShrink:0,
-                        background: '#6366f1'
-                      }}/>
-
-                      {/* Memory content — full width */}
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{
-                          fontSize:'14px', fontWeight:500,
-                          color:theme.text,
-                          overflow:'hidden', textOverflow:'ellipsis',
-                          whiteSpace:'nowrap'
-                        }}>
-                          {mem.summary || mem.title}
-                        </div>
-                        <div style={{ fontSize:'12px',
-                                      color:theme.textMuted,
-                                      marginTop:'3px' }}>
-                          {mem.app} · {mem.timestamp}
-                        </div>
-                      </div>
-
-                      {/* App badge */}
-                      <div style={{
-                        fontSize:'11px', padding:'3px 10px',
-                        background:theme.bgInput,
-                        border:`1px solid ${theme.border}`,
-                        borderRadius:'20px',
-                        color:theme.textMuted,
-                        flexShrink:0
-                      }}>
-                        {mem.app}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
+        <main style={{ padding: '28px 32px', animation: 'fadeIn 0.25s ease', flex: 1, display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1000px', margin: '0 auto', width: '100%' }}>
+          
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+            <div style={{ flex: 1 }}>
+              <Input 
+                icon="🔍"
+                placeholder="Search memories by app, content, or context..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                accent={C.purple}
+              />
+            </div>
+            <select style={{ 
+              background: C.bgElevated, border: `1px solid ${C.border}`, color: C.textPrimary, 
+              padding: '10px 16px', borderRadius: R.md, outline: 'none', cursor: 'pointer',
+              fontFamily: F.family, fontSize: F.sm
+            }}>
+              <option>All Dates</option>
+              <option>Past 24h</option>
+              <option>Past Week</option>
+            </select>
           </div>
-        ))
-      )}
-    </div>
-  )
-}
 
-export default Timeline
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', marginTop: '16px' }}>
+            {Object.entries(mockData).map(([section, memories]) => {
+              const count = memories.length;
+              const isCollapsed = collapsed[section];
+
+              return (
+                <div key={section} style={{ display: 'flex', flexDirection: 'column' }}>
+                  
+                  {/* Section Header */}
+                  <div 
+                    onClick={() => toggleSection(section)}
+                    style={{ 
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '12px 16px', borderRadius: R.md, background: C.bgActive,
+                      cursor: 'pointer', transition: C.transition.fast,
+                      borderBottom: isCollapsed ? `1px solid ${C.border}` : '1px solid transparent'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = `${C.bgActive}dd`}
+                    onMouseLeave={e => e.currentTarget.style.background = C.bgActive}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ fontSize: '12px', color: C.textMuted }}>{isCollapsed ? '▶' : '▼'}</span>
+                      <span style={{ fontSize: F.md, fontWeight: F.semibold, color: C.textPrimary }}>{section}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <Badge color={C.purple}>{count} memories</Badge>
+                      <span style={{ fontSize: F.xs, color: C.textSecondary, cursor: 'pointer' }} onClick={e => e.stopPropagation()}>Export ↓</span>
+                    </div>
+                  </div>
+
+                  {/* Section Content */}
+                  {!isCollapsed && (
+                    <div style={{ paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {count === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '40px 0', color: C.textMuted, fontSize: F.sm }}>
+                          <div style={{ fontSize: '32px', marginBottom: '8px' }}>🗃️</div>
+                          No memories yet for this period
+                        </div>
+                      ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '12px' }}>
+                          {memories.map(m => (
+                            <Card 
+                              key={m.id} 
+                              padding="16px" 
+                              onClick={() => {}} 
+                              style={{ 
+                                display: 'flex', flexDirection: 'column', gap: '12px',
+                                borderLeft: `3px solid ${m.color}`
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: m.color }} />
+                                  <span style={{ fontSize: F.xs, fontWeight: F.bold, color: C.textSecondary }}>{m.app}</span>
+                                </div>
+                                <span style={{ fontSize: F.xs, color: C.textMuted }}>{m.time}</span>
+                              </div>
+                              
+                              <div>
+                                <div style={{ fontSize: F.md, fontWeight: F.semibold, color: C.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {m.title}
+                                </div>
+                                <div style={{ fontSize: F.xs, color: C.textSecondary, marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: F.mono }}>
+                                  {m.url}
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontSize: F.xs, fontWeight: F.bold, color: m.focus >= 75 ? C.success : m.focus >= 50 ? C.warning : C.danger }}>{m.focus}</span>
+                                  <FocusBar score={m.focus} size="sm" />
+                                </div>
+                                <span style={{ fontSize: F.xs, color: C.textMuted, fontFamily: F.mono }}>
+                                  {m.session} session
+                                </span>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                </div>
+              );
+            })}
+          </div>
+
+        </main>
+      </div>
+    </div>
+  );
+}

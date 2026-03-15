@@ -1,136 +1,162 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-
-const API = ''
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { GlobalStyles } from '../components/ui/GlobalStyles';
+import { Sidebar } from '../components/ui/Sidebar';
+import { TopBar } from '../components/ui/TopBar';
+import { Card } from '../components/ui/Card';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { StatusDot } from '../components/ui/StatusDot';
+import { C, S, F, R } from '../design/tokens';
 
 export default function EmployeeHome() {
-  const navigate = useNavigate()
-  const token = localStorage.getItem('ws_emp_token')
-  const orgName = localStorage.getItem('ws_org_name') || ''
-  const empCode = localStorage.getItem('ws_emp_code') || ''
-  const name = localStorage.getItem('ws_emp_name') || 'Employee'
-  const [dismissBanner, setDismissBanner] = useState(() => JSON.parse(localStorage.getItem('ws_banner_dismiss') || 'false'))
-  const [goals, setGoals] = useState([])
-  const [goalInput, setGoalInput] = useState('')
-  const [performance, setPerformance] = useState(null)
-  const [coachTip, setCoachTip] = useState('Your peak focus is 10am–12pm. Block this time — no meetings, no Slack.')
+  const navigate = useNavigate();
+  const [name, setName] = useState('Employee');
+  const [orgName, setOrgName] = useState('Acme Corp');
+  const [empCode, setEmpCode] = useState('EMP-742');
+  const [goals, setGoals] = useState(['Complete the auth module rewrite', 'Review Sarah\'s PR for API Gateway']);
+  const [goalInput, setGoalInput] = useState('');
+  const [score, setScore] = useState(87);
+  const [isBannerVisible, setIsBannerVisible] = useState(true);
 
-  useEffect(() => {
-    if (!token) { navigate('/setup'); return }
-  }, [token, navigate])
+  const NAV_ITEMS = [
+    { id: 'home',      label: 'My Focus',      icon: '👔' },
+    { id: 'timeline',  label: 'Timeline',      icon: '📅' },
+    { id: 'intelligence', label: 'Intelligence', icon: '🧠' },
+    { id: 'div',       label: '─────────────', icon: '' },
+    { id: 'setup',     label: 'Account',       icon: '⚙️' },
+  ];
 
-  useEffect(() => {
-    const raw = localStorage.getItem('ws_goals')
-    if (raw) try { setGoals(JSON.parse(raw)); } catch (_) {}
-  }, [])
-
-  useEffect(() => {
-    if (!token) return
-    fetch(`${API}/employee/my-performance`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(setPerformance)
-      .catch(() => {})
-  }, [token])
-
-  const saveGoals = (g) => {
-    setGoals(g)
-    localStorage.setItem('ws_goals', JSON.stringify(g))
-    if (token) fetch(`${API}/employee/goals`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ goals: g }) }).catch(() => {})
-  }
+  const logo = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: F.lg, fontWeight: F.bold, color: C.textPrimary }}>
+      <span style={{ color: C.teal }}>🏢</span> WorkSense
+    </div>
+  );
 
   const addGoal = () => {
-    if (!goalInput.trim()) return
-    saveGoals([...goals, goalInput.trim()])
-    setGoalInput('')
-  }
+    if (!goalInput.trim()) return;
+    setGoals([...goals, goalInput.trim()]);
+    setGoalInput('');
+  };
 
-  const removeGoal = (i) => {
-    saveGoals(goals.filter((_, idx) => idx !== i))
-  }
-
-  const dismissBannerToday = () => {
-    setDismissBanner(true)
-    const d = new Date().toDateString()
-    localStorage.setItem('ws_banner_dismiss', JSON.stringify(true))
-    localStorage.setItem('ws_banner_dismiss_date', d)
-  }
-
-  const completed = goals.filter((_, i) => false) // placeholder: no toggle in spec
-  const pct = goals.length ? Math.round((completed.length / goals.length) * 100) : 0
-  const score = performance?.avg_focus_score ?? 0
-  const trend = performance?.trend ?? 'stable'
-  const burnoutRisk = performance?.burnout_risk ?? 'low'
-  const achievements = performance?.achievements ?? []
-  const workHours = 8.25
-
-  if (!token) return null
+  const removeGoal = (idx) => {
+    setGoals(goals.filter((_, i) => i !== idx));
+  };
 
   return (
-    <div style={{ paddingTop: 48, paddingBottom: 100, minHeight: '100vh', background: '#0f0f0f', color: '#fff' }}>
-      <h1 style={{ padding: '24px 24px 8px', fontSize: 24 }}>Good morning, {name} 👔</h1>
-      <p style={{ padding: '0 24px 24px', color: '#9ca3af' }}>{orgName} · {empCode}</p>
+    <div style={{ display: 'flex', minHeight: '100vh', background: C.bg }}>
+      <GlobalStyles />
 
-      {!dismissBanner && (
-        <div style={{ margin: 24, padding: 20, background: '#0a0f1e', borderLeft: '4px solid #14b8a6', borderRadius: 8 }}>
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>🔒 COS WorkSense is active</div>
-          <p style={{ color: '#9ca3af', fontSize: 14, marginBottom: 12 }}>
-            Your manager can see: which app · focus score · context switches.<br />
-            Your manager CANNOT see: screen content · keystrokes · messages.<br />
-            You are always informed — never surveilled.
-          </p>
-          <button type="button" onClick={dismissBannerToday} style={{ padding: '8px 16px', background: '#14b8a6', color: '#000', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>Got it ✓</button>
-        </div>
-      )}
+      <Sidebar 
+        items={NAV_ITEMS} 
+        active="home" 
+        onSelect={(id) => { if (id !== 'div') navigate(`/${id}`) }} 
+        logo={logo} 
+        accent={C.teal} 
+      />
 
-      <div style={{ margin: 24, padding: 24, background: '#111', border: '1px solid #1f2937', borderRadius: 12, textAlign: 'center' }}>
-        <div style={{ fontSize: 14, color: '#9ca3af', marginBottom: 8 }}>Your focus score today</div>
-        <div style={{ fontSize: 48, fontWeight: 700, color: score >= 75 ? '#22c55e' : score >= 50 ? '#eab308' : '#ef4444' }}>{score}</div>
-        <div style={{ color: '#9ca3af', marginTop: 8 }}>Trend: ↑ +12 from yesterday 🚀</div>
-      </div>
+      <div style={{ marginLeft: '220px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <TopBar 
+          title={`Good morning, ${name}`} 
+          subtitle={`${orgName} · ${empCode}`}
+          actions={<Badge color={C.teal} dot>Focus: {score}</Badge>}
+          accent={C.teal} 
+        />
 
-      <div style={{ margin: 24 }}>
-        <h2 style={{ marginBottom: 12 }}>Today's Goals (private — manager cannot see)</h2>
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-          {goals.map((g, i) => (
-            <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span>☐</span>
-              <span>{g}</span>
-              <button type="button" onClick={() => removeGoal(i)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>×</button>
-            </li>
-          ))}
-        </ul>
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <input type="text" value={goalInput} onChange={e => setGoalInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addGoal()} placeholder="Add goal" style={{ flex: 1, padding: 10, background: '#0f0f0f', border: '1px solid #1f2937', borderRadius: 8, color: '#fff' }} />
-          <button type="button" onClick={addGoal} style={{ padding: '10px 20px', background: '#14b8a6', color: '#000', border: 'none', borderRadius: 8, cursor: 'pointer' }}>+ Add goal</button>
-        </div>
-        <p style={{ color: '#9ca3af', fontSize: 14, marginTop: 8 }}>Progress: {goals.length ? '1 of ' + goals.length + ' complete' : '0 goals'}</p>
-      </div>
+        <main style={{ padding: '28px 32px', animation: 'fadeIn 0.25s ease', flex: 1, display: 'flex', flexDirection: 'column', gap: '32px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+          
+          {/* Privacy Banner */}
+          {isBannerVisible && (
+            <div style={{ 
+              background: `${C.teal}10`, border: `1px solid ${C.teal}40`, borderLeft: `4px solid ${C.teal}`,
+              padding: '20px 24px', borderRadius: R.md, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: F.md, fontWeight: F.bold, color: C.textPrimary, marginBottom: '8px' }}>🔒 Protected by Neural Privacy</div>
+                <p style={{ fontSize: F.sm, color: C.textSecondary, lineHeight: 1.6 }}>
+                  WorkSense is active. Your manager can see your <strong>context title</strong> and <strong>focus score</strong>. 
+                  Individual keystrokes, screenshots, and private messages are <strong>never</strong> captured.
+                </p>
+              </div>
+              <button 
+                onClick={() => setIsBannerVisible(false)}
+                style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: '20px' }}
+              >
+                ×
+              </button>
+            </div>
+          )}
 
-      <div style={{ margin: 24, padding: 20, background: 'rgba(245,158,11,0.1)', border: '1px solid #f59e0b', borderRadius: 12 }}>
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>💡 Your COS Coach</div>
-        <p style={{ color: '#e5e5e5', fontSize: 14 }}>{coachTip}</p>
-      </div>
+          {/* ZONE 1: Focus Score */}
+          <Card padding="32px" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ fontSize: F.xs, color: C.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Focus Score</div>
+            <div style={{ fontSize: '64px', fontWeight: F.black, color: score >= 75 ? C.success : C.amber }}>{score}</div>
+            <div style={{ fontSize: F.sm, color: C.textSecondary }}>Trend: <span style={{ color: C.success }}>↑ +12</span> from yesterday</div>
+          </Card>
 
-      <div style={{ margin: 24, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        {['🔥 Top Performer', '🎯 Focus Master', '⚡ Deep Worker', '🌟 Streak King'].map(badge => (
-          <span key={badge} style={{ padding: '8px 12px', background: achievements.includes(badge) ? '#14b8a622' : '#2a2a2a', color: achievements.includes(badge) ? '#14b8a6' : '#6b7280', borderRadius: 20, fontSize: 13 }}>{badge}</span>
-        ))}
-      </div>
+          {/* ZONE 2: Goals */}
+          <div>
+            <h3 style={{ fontSize: F.lg, fontWeight: F.bold, color: C.textPrimary, marginBottom: '16px' }}>Private Work Goals</h3>
+            <Card padding="24px" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <Input 
+                    placeholder="What are you focusing on right now?" 
+                    value={goalInput}
+                    onChange={e => setGoalInput(e.target.value)}
+                    accent={C.teal}
+                  />
+                </div>
+                <Button variant="primary" onClick={addGoal} style={{ background: C.teal, borderColor: C.teal }}>Add Goal</Button>
+              </div>
 
-      {(burnoutRisk === 'medium' || burnoutRisk === 'high') && (
-        <div style={{ margin: 24, padding: 20, background: 'rgba(239,68,68,0.1)', border: '1px solid #ef4444', borderRadius: 12 }}>
-          <div style={{ fontWeight: 600, color: '#ef4444' }}>⚠️ Heads up: declining focus over 3 days</div>
-          <p style={{ color: '#e5e5e5', fontSize: 14 }}>Consider scheduling recovery time.</p>
-        </div>
-      )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {goals.map((g, i) => (
+                  <div key={i} style={{ 
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
+                    padding: '12px 16px', background: C.bgActive, borderRadius: R.sm, border: `1px solid ${C.borderLight}`
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ fontSize: '16px', opacity: 0.5 }}>☐</span>
+                      <span style={{ fontSize: F.sm, color: C.textPrimary }}>{g}</span>
+                    </div>
+                    <button onClick={() => removeGoal(i)} style={{ background: 'none', border: 'none', color: C.danger, cursor: 'pointer', fontSize: F.sm }}>×</button>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
 
-      <div style={{ margin: 24 }}>
-        <div style={{ marginBottom: 8 }}>Work hours today: {workHours}h</div>
-        <div style={{ height: 8, background: '#1f2937', borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ width: `${Math.min(100, (workHours / 8) * 100)}%`, height: '100%', background: workHours > 8 ? '#ef4444' : '#22c55e', borderRadius: 4 }} />
-        </div>
-        <p style={{ color: '#9ca3af', fontSize: 14 }}>Recommended: 8h max</p>
+          {/* ZONE 3: Coach and Badges */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px' }}>
+             <div style={{ background: `${C.bgElevated}80`, padding: '24px', borderRadius: R.md, borderLeft: `3px solid ${C.teal}` }}>
+                <div style={{ fontSize: F.xs, fontWeight: F.bold, color: C.teal, textTransform: 'uppercase', marginBottom: '8px' }}>💡 Neural Coach</div>
+                <div style={{ fontSize: F.sm, color: C.textPrimary, lineHeight: 1.6 }}>
+                  Your peak focus is between 10 AM and 12 PM. We've detected that Slack notifications often break your flow during this period. Try enabling Focus Mode.
+                </div>
+             </div>
+             
+             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignContent: 'flex-start' }}>
+                {['🔥 Top Performer', '🎯 Focus Master', '⚡ Deep Worker', '🌟 Streak King'].map((b, i) => (
+                  <Badge key={i} color={i === 0 ? C.success : C.textMuted}>{b}</Badge>
+                ))}
+             </div>
+          </div>
+
+          {/* ZONE 4: Work Hours */}
+          <Card padding="24px">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <span style={{ fontSize: F.sm, fontWeight: F.semibold, color: C.textPrimary }}>Cognitive Load Today</span>
+              <span style={{ fontSize: F.sm, color: C.textSecondary }}>8.25h / 8h Rec.</span>
+            </div>
+            <div style={{ width: '100%', height: '8px', background: C.bgActive, borderRadius: R.full, overflow: 'hidden' }}>
+              <div style={{ width: '90%', height: '100%', background: C.success, borderRadius: R.full }} />
+            </div>
+          </Card>
+
+        </main>
       </div>
     </div>
-  )
+  );
 }
