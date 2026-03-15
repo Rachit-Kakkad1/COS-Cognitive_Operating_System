@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { BrainLogo, SearchIcon, WifiIcon, AppIcon, ClockIcon, BoltIcon } from '../../components/Icons'
 import { useMode } from '../../context/ModeContext'
 
-const API = 'http://localhost:8000'
+const API = '/api'
+const MODE_API = '/mode'
 
 function ThinkingDots() {
   return (
@@ -75,7 +76,7 @@ export default function ProfessionalHome() {
     if (!query.trim()) return
     setLoading(true); setResult(null)
     try {
-      const res = await fetch(`${API}/mode/recall?query=${encodeURIComponent(query)}&k=1&mode=professional`)
+      const res = await fetch(`${MODE_API}/recall?query=${encodeURIComponent(query)}&k=1&mode=professional`)
       const data = await res.json()
       setResult(data.results?.[0] || { message: 'No relevant data found in short-term memory.', app: '', timestamp: '' })
     } catch {

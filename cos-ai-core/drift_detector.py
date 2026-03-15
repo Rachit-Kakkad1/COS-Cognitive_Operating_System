@@ -20,13 +20,13 @@ def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     return float(dot / norm) if norm > 0 else 0.0
 
 
-def start_drift_detection(get_current_embedding_fn, get_app_fn=None, interval=10):
+def start_drift_detection(get_current_embedding_fn, on_drift=None, interval=10):
     """
     Start drift detection in a background daemon thread.
 
     Args:
         get_current_embedding_fn: callable returning (app: str, embedding: np.ndarray)
-        get_app_fn: unused, kept for API compat
+        on_drift: callback(prev_app, app, prev_embedding, embedding, similarity)
         interval: seconds between checks (default 10)
     """
     prev_app = None
@@ -47,12 +47,15 @@ def start_drift_detection(get_current_embedding_fn, get_app_fn=None, interval=10
                 if prev_embedding is not None and embedding is not None:
                     sim = _cosine_similarity(embedding, prev_embedding)
                     if sim < 0.4:
-                        print(f"[Drift] Context switch detected: {prev_app} → {app}")
-                        # Auto-trigger recall overlay
-                        try:
-                            requests.post(f"{BACKEND_URL}/hotkey/recall", timeout=2)
-                        except Exception:
-                            pass
+                        print(f"[Drift] Context switch detected: {prev_app} → {app} (sim:{sim:.2f})")
+                        if on_drift:
+                            on_drift(prev_app, app, prev_embedding, embedding, sim)
+                        else:
+                            # Default fallback
+                            try:
+                                requests.post(f"{BACKEND_URL}/hotkey/recall", timeout=2)
+                            except Exception:
+                                pass
 
             prev_app = app
             if embedding is not None:

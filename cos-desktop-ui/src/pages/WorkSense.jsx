@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
    Live cognitive workforce intelligence, powered by WebSocket.
    ──────────────────────────────────────────────────────────────────────── */
 
-const API = 'http://localhost:8000'
+const API = ''
 
 // ─── Focus bar component ────────────────────────────────────────────────
 const FocusBar = ({ score }) => {
@@ -178,7 +178,8 @@ export default function WorkSense() {
     let reconnectTimer
 
     const connect = () => {
-      ws = new WebSocket(`ws://localhost:8000/worksense/manager/live/${managerToken}`)
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      ws = new WebSocket(`${wsProtocol}//${window.location.host}/worksense/manager/live/${managerToken}`)
 
       ws.onopen = () => {
         setLive(true)

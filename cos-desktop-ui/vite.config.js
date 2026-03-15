@@ -7,19 +7,27 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
       '/worksense': {
-        target: 'http://localhost:8000',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         ws: true,
       },
       '/guardian': {
-        target: 'http://localhost:8000',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         ws: true,
+      },
+      '/student': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/mode': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
       },
     },
   },

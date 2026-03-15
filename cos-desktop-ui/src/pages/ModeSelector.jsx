@@ -1,17 +1,32 @@
-// ModeSelector.jsx
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMode } from '../context/ModeContext'
+import { useTheme } from '../context/ThemeContext'
 
 const ModeSelector = () => {
   const { MODES, selectMode } = useMode()
+  const { theme } = useTheme()
   const navigate = useNavigate()
   const [personalizing, setPersonalizing] = useState(false)
   const [progress, setProgress] = useState(0)
 
-  const handleSelect = (modeId) => {
+  const handleSelect = async (modeId) => {
     setPersonalizing(true)
     selectMode(modeId)
+
+    try {
+      const res = await fetch('http://localhost:8000/role/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: modeId })
+      })
+      const data = await res.json()
+      if (data.token) {
+        localStorage.setItem('cos_role_token', data.token)
+      }
+    } catch (e) {
+      console.warn('[Role] Backend save failed — using local only')
+    }
 
     let p = 0
     const int = setInterval(() => {
@@ -19,9 +34,7 @@ const ModeSelector = () => {
       setProgress(Math.min(p, 100))
       if (p >= 100) {
         clearInterval(int)
-        setTimeout(() => {
-          navigate('/')
-        }, 200)
+        setTimeout(() => navigate('/home'), 200)
       }
     }, 150)
   }
@@ -30,12 +43,12 @@ const ModeSelector = () => {
     return (
       <div style={{
         minHeight: '100vh', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', background: '#0a0a0a'
+        alignItems: 'center', justifyContent: 'center', background: theme.bg
       }}>
         <div style={{ fontSize: '48px', animation: 'pulse 1.5s infinite' }}>🧠</div>
-        <h2 style={{ color: '#fff', marginTop: '24px', fontWeight: 600 }}>Personalizing COS for you...</h2>
-        <div style={{ width: '280px', height: '6px', background: '#222', borderRadius: '3px', marginTop: '20px', overflow: 'hidden' }}>
-          <div style={{ width: `${progress}%`, height: '100%', background: '#6366f1', transition: 'width 0.15s linear' }} />
+        <h2 style={{ color: theme.text, marginTop: '24px', fontWeight: 600 }}>Personalizing COS for you...</h2>
+        <div style={{ width: '280px', height: '6px', background: theme.border, borderRadius: '3px', marginTop: '20px', overflow: 'hidden' }}>
+          <div style={{ width: `${progress}%`, height: '100%', background: theme.purple, transition: 'width 0.15s linear' }} />
         </div>
         <style>{`
           @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
@@ -45,11 +58,11 @@ const ModeSelector = () => {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0a', padding: '60px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <div style={{ minHeight: '100vh', background: theme.bg, padding: '60px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', transition: 'background 0.3s' }}>
       <div style={{ textAlign: 'center', marginBottom: '60px' }}>
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🧠</div>
-        <h1 style={{ color: '#fff', fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>Which version of COS are you?</h1>
-        <p style={{ color: '#a1a1aa', fontSize: '18px' }}>Choose your mode. COS becomes yours.</p>
+        <h1 style={{ color: theme.text, fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>Which version of COS are you?</h1>
+        <p style={{ color: theme.textMuted, fontSize: '18px' }}>Choose your mode. COS becomes yours.</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', maxWidth: '960px', width: '100%' }}>
@@ -59,6 +72,7 @@ const ModeSelector = () => {
           mode={MODES.professional} 
           onSelect={() => handleSelect('professional')}
           pills={['Context Recall', 'Voice AI', 'Cognitive Graph']}
+          isDark={theme.dark}
         />
 
         {/* Student */}
@@ -66,6 +80,7 @@ const ModeSelector = () => {
           mode={MODES.student} 
           onSelect={() => handleSelect('student')}
           pills={['Study Tracker', 'Exam Countdown', 'Streak']}
+          isDark={theme.dark}
         />
 
         {/* Parent */}
@@ -73,7 +88,7 @@ const ModeSelector = () => {
           mode={MODES.parent} 
           onSelect={() => handleSelect('parent')}
           pills={['Child Monitor', 'Screen Time', 'Safe Browsing']}
-          light
+          isDark={theme.dark}
         />
 
         {/* Child */}
@@ -81,7 +96,7 @@ const ModeSelector = () => {
           mode={MODES.child} 
           onSelect={() => handleSelect('child')}
           pills={['Fun Timer', 'Rewards', 'Safe Mode']}
-          light child
+          isDark={theme.dark} child
         />
 
         {/* Senior */}
@@ -89,7 +104,7 @@ const ModeSelector = () => {
           mode={MODES.senior} 
           onSelect={() => handleSelect('senior')}
           pills={['Memory Help', 'Voice First', 'Simple UI']}
-          light
+          isDark={theme.dark}
         />
 
         {/* Employee */}
@@ -97,6 +112,7 @@ const ModeSelector = () => {
           mode={MODES.employee} 
           onSelect={() => handleSelect('employee')}
           pills={['Performance', 'Burnout Alert', 'Daily Goals']}
+          isDark={theme.dark}
         />
 
       </div>
@@ -104,17 +120,17 @@ const ModeSelector = () => {
   )
 }
 
-const ModeCard = ({ mode, onSelect, pills, light, child }) => {
+const ModeCard = ({ mode, onSelect, pills, isDark, child }) => {
   const [hover, setHover] = useState(false)
-  const c = mode.colors
+  const c = mode.colors[isDark ? 'dark' : 'light']
 
   return (
     <div 
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        background: child ? '#fff0ff' : (light ? '#f8fafc' : c.surface),
-        border: `2px solid ${c.primary}`,
+        background: c.surface,
+        border: `2px solid ${c.border}`,
         borderRadius: '16px',
         padding: '24px',
         display: 'flex',
@@ -133,16 +149,16 @@ const ModeCard = ({ mode, onSelect, pills, light, child }) => {
       )}
 
       <div style={{ fontSize: '48px', marginBottom: '16px' }}>{mode.emoji}</div>
-      <h3 style={{ color: light ? '#111' : '#fff', fontSize: '20px', fontWeight: 600, marginBottom: '6px' }}>{mode.label}</h3>
-      <p style={{ color: light ? '#444' : '#a1a1aa', fontSize: '13px', marginBottom: '16px', lineHeight: 1.4 }}>{mode.description}</p>
+      <h3 style={{ color: c.text, fontSize: '20px', fontWeight: 600, marginBottom: '6px' }}>{mode.label}</h3>
+      <p style={{ color: c.textMuted, fontSize: '13px', marginBottom: '16px', lineHeight: 1.4 }}>{mode.description}</p>
       
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'auto' }}>
         {pills.map(p => (
           <span key={p} style={{
-            background: light ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
+            background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
             border: `1px solid ${c.primary}40`,
             borderRadius: '12px', padding: '4px 10px',
-            fontSize: '11px', color: light ? '#333' : '#e0e0e0'
+            fontSize: '11px', color: c.text
           }}>
             {p}
           </span>

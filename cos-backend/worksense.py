@@ -109,6 +109,12 @@ def verify_token(token: str) -> dict:
     except JWTError:
         return {}
 
+
+def create_access_token(payload: dict) -> str:
+    """Encode a JWT with exp; used for role/personal tokens."""
+    return _create_token(dict(payload))
+
+
 def _decode_token(token: str) -> dict:
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])

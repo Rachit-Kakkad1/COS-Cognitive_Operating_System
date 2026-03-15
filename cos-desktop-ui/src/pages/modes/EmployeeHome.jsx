@@ -14,14 +14,15 @@ export default function EmployeeHome() {
   ])
 
   useEffect(() => {
-    // Fetch employee data
-    const token = localStorage.getItem('cos_token')
-    fetch('http://localhost:8000/employee/my-performance', {
-      headers: { Authorization: `Bearer ${token}` }
-    }).then(r => r.json()).then(setPerf).catch(() => {})
-
-    fetch(`http://localhost:8000/mode/coach-tip?mode=employee`)
-      .then(r => r.json()).then(setTip).catch(() => {})
+    Promise.all([
+      fetch('/worksense/employee/my-performance', {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(r => r.json()),
+      fetch(`/mode/coach-tip?mode=employee`).then(r => r.json())
+    ]).then(([p, t]) => {
+      setPerf(p)
+      setTip(t)
+    }).catch(() => {})
   }, [])
 
   return (
@@ -31,7 +32,7 @@ export default function EmployeeHome() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 700, color: c.text, marginBottom: 8 }}>Good morning! 👔</h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: c.accent, fontWeight: 600, background: 'rgba(22, 163, 74, 0.1)', padding: '6px 12px', borderRadius: 8, display: 'inline-flex' }}>
+          <div style={{ alignItems: 'center', gap: 8, color: c.accent, fontWeight: 600, background: 'rgba(22, 163, 74, 0.1)', padding: '6px 12px', borderRadius: 8, display: 'inline-flex' }}>
             <span>↑ 12 points from yesterday 🚀</span>
           </div>
         </div>

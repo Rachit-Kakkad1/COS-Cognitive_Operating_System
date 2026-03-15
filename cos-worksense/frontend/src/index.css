@@ -1,0 +1,15 @@
+:root {
+  --bg: #0f0f0f;
+  --surface: #111111;
+  --border: #1f2937;
+  --text: #f9fafb;
+  --muted: #9ca3af;
+  --primary: #14b8a6;
+  --danger: #ef4444;
+  --warning: #eab308;
+  --success: #22c55e;
+  --amber: #f59e0b;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; }

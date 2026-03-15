@@ -16,11 +16,10 @@ export default function StudentHome() {
   const [sessionTime, setSessionTime] = useState(0)
 
   useEffect(() => {
-    // Fetch data from new /student endpoints
     Promise.all([
-      fetch('http://localhost:8000/student/dashboard').then(r => r.json()),
-      fetch('http://localhost:8000/student/exams').then(r => r.json()),
-      fetch('http://localhost:8000/student/badges').then(r => r.json())
+      fetch('/student/dashboard').then(r => r.json()),
+      fetch('/student/exams').then(r => r.json()),
+      fetch('/student/badges').then(r => r.json())
     ]).then(([d, e, b]) => {
       setDb(d)
       setExams(e.exams)

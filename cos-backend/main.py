@@ -30,8 +30,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "cos-ai-core"))
 from database import insert_memory, get_all_memories, get_memories_by_app, get_memories_by_date, get_memory_by_id, _get_conn
 from vector_store import vector_store
 from recall_engine import recall
-from worksense import worksense_router, verify_token
+from worksense import worksense_router, verify_token, create_access_token
 from student import student_router
+from starlette.middleware.base import BaseHTTPMiddleware
 
 # Lazy import to avoid loading model at import time if not needed
 _pipeline = None
@@ -77,6 +78,123 @@ app.add_middleware(
 # ─── WorkSense & Student APIs ────────────────────────────────────────────
 app.include_router(worksense_router)
 app.include_router(student_router)
+
+
+# ─── Role verification (allowed endpoints per role) ───────────────────────
+ROLE_ALLOWED_ENDPOINTS = {
+    "professional": [
+        "/recall", "/memory", "/timeline", "/graph",
+        "/memories", "/hotkey/recall", "/reopen",
+        "/switch_status", "/report/", "/system/",
+        "/storage/status", "/storage/clear",
+        "/mode/recall", "/mode/coach-tip", "/mode/save",
+    ],
+    "student": [
+        "/recall", "/memory", "/timeline", "/graph",
+        "/memories", "/hotkey/recall", "/reopen",
+        "/switch_status", "/storage/status",
+        "/student/", "/mode/recall", "/mode/coach-tip", "/mode/save",
+    ],
+    "child": [
+        "/memory", "/switch_status", "/student/", "/mode/recall", "/mode/save",
+    ],
+    "senior": [
+        "/recall", "/memory", "/timeline", "/memories",
+        "/hotkey/recall", "/storage/status", "/mode/recall", "/mode/save",
+    ],
+    "parent": [
+        "/timeline", "/memories", "/storage/status",
+        "/student/", "/mode/recall", "/mode/save",
+    ],
+    "employee": [
+        "/recall", "/memory", "/timeline", "/graph",
+        "/memories", "/hotkey/recall", "/reopen",
+        "/switch_status", "/storage/status",
+        "/mode/recall", "/mode/coach-tip", "/mode/save",
+        "/system/", "/worksense/employee",
+    ],
+    "manager": [
+        "/worksense/manager", "/worksense/org",
+        "/system/power-monitor", "/system/kill-process", "/system/cpu-snapshot",
+        "/timeline", "/storage/status", "/mode/save",
+    ],
+}
+
+BLOCKED_MESSAGES_BACKEND = {
+    "child": {
+        "default": "This feature is not available in Child mode.",
+        "/graph": "Cognitive graph is not available for children.",
+        "/system": "System controls require a grown-up account.",
+        "/recall": "Advanced recall is not available in Child mode.",
+    },
+    "parent": {
+        "default": "This feature is not available in Parent mode.",
+        "/graph": "Cognitive graph is in Professional mode.",
+        "/guardian": "Tab Guardian is not set up for Parent mode.",
+    },
+    "senior": {
+        "default": "This feature is not part of your setup.",
+        "/graph": "This feature is not needed for your account.",
+        "/system": "System controls are not part of your account.",
+    },
+    "employee": {
+        "default": "This feature is not in Employee mode.",
+        "/worksense/manager": "Only managers can access this.",
+        "/worksense/org": "Only managers can manage the organisation.",
+    },
+    "manager": {
+        "default": "This feature is not in Manager mode.",
+        "/student": "Student features are not in Manager mode.",
+        "/child": "Child features are not in Manager mode.",
+    },
+}
+
+
+def _get_blocked_message(role: str, path: str) -> str:
+    messages = BLOCKED_MESSAGES_BACKEND.get(role, {})
+    for key, msg in messages.items():
+        if key != "default" and key in path:
+            return msg
+    return messages.get("default", f"This endpoint is not available for role: {role}")
+
+
+def _verify_role_for_endpoint(role: str, path: str) -> None:
+    allowed = ROLE_ALLOWED_ENDPOINTS.get(role, [])
+    for prefix in allowed:
+        if path.startswith(prefix) or path == prefix.rstrip("/"):
+            return
+    msg = _get_blocked_message(role, path)
+    raise HTTPException(
+        status_code=403,
+        detail={
+            "blocked": True,
+            "role": role,
+            "path": path,
+            "message": msg,
+            "redirect": f"/home",
+        },
+    )
+
+
+class RoleMiddleware(BaseHTTPMiddleware):
+    SKIP_PATHS = ("/health", "/auth", "/docs", "/openapi.json", "/redoc", "/role/save", "/role/current")
+
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if any(path.startswith(p) for p in self.SKIP_PATHS):
+            return await call_next(request)
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            token = auth.replace("Bearer ", "").strip()
+            if token:
+                payload = verify_token(token)
+                if payload:
+                    role = payload.get("role", "professional")
+                    _verify_role_for_endpoint(role, path)
+        return await call_next(request)
+
+
+app.add_middleware(RoleMiddleware)
 
 
 # ─── Request logging middleware ──────────────────────────────────────────
@@ -183,41 +301,94 @@ async def get_graph():
 
 
 @app.get("/timeline")
-async def timeline_by_period(
-    period: str = Query(default="today"),
-    authorization: str = Header(default=None)
-):
+async def get_timeline():
     """
-    Returns memories for a specific time period.
-    Periods: today · yesterday · last_week ·
-             last_month · last_2months · last_6months
+    Returns all memories grouped into 6 time buckets.
+    Handles multiple timestamp formats robustly.
     """
-    PERIOD_SQL = {
-        "today":        "DATE(timestamp) = DATE('now')",
-        "yesterday":    "DATE(timestamp) = DATE('now','-1 day')",
-        "last_week":    "timestamp >= datetime('now','-7 days')",
-        "last_month":   "timestamp >= datetime('now','-30 days')"
-                        " AND timestamp < datetime('now','-7 days')",
-        "last_2months": "timestamp >= datetime('now','-60 days')"
-                        " AND timestamp < datetime('now','-30 days')",
-        "last_6months": "timestamp >= datetime('now','-180 days')"
-                        " AND timestamp < datetime('now','-60 days')",
-    }
-    where = PERIOD_SQL.get(period, PERIOD_SQL["today"])
-    conn  = _get_conn()
-    rows  = conn.execute(f"""
-        SELECT memory_id, title, summary, app, timestamp
-        FROM memories
-        WHERE {where}
-        ORDER BY timestamp DESC
-        LIMIT 200
-    """).fetchall()
+    from datetime import datetime, timedelta
+
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT * FROM memories ORDER BY timestamp DESC"
+    ).fetchall()
     conn.close()
-    return {
-        "period":   period,
-        "memories": [dict(r) for r in rows],
-        "count":    len(rows)
+
+    now       = datetime.now()
+    today     = now.date()
+    yesterday = today - timedelta(days=1)
+
+    buckets = {
+        'today':      [],
+        'yesterday':  [],
+        'last_week':  [],
+        'last_month': [],
+        'last_2mo':   [],
+        'last_6mo':   [],
     }
+
+    for row in rows:
+        mem = dict(row)
+
+        # Get timestamp — try multiple field names
+        raw_ts = (
+            mem.get('timestamp') or
+            mem.get('created_at') or
+            mem.get('time') or
+            ''
+        )
+
+        # Parse timestamp robustly
+        ts = None
+        for fmt in [
+            "%Y-%m-%d %H:%M:%S.%f",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S.%f",
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%d %H:%M",
+            "%Y-%m-%d",
+        ]:
+            try:
+                ts = datetime.strptime(str(raw_ts)[:26], fmt)
+                break
+            except Exception:
+                continue
+
+        # If still no timestamp — use epoch from int field
+        if ts is None:
+            try:
+                epoch = mem.get('timestamp')
+                if isinstance(epoch, (int, float)) and epoch > 1000000000:
+                    ts = datetime.fromtimestamp(epoch)
+                else:
+                    ts = now  # fallback to today
+            except Exception:
+                ts = now
+
+        # Bucket it
+        days_ago = (now - ts).days
+
+        if ts.date() == today:
+            buckets['today'].append(mem)
+        elif ts.date() == yesterday:
+            buckets['yesterday'].append(mem)
+        elif days_ago <= 7:
+            buckets['last_week'].append(mem)
+        elif days_ago <= 30:
+            buckets['last_month'].append(mem)
+        elif days_ago <= 60:
+            buckets['last_2mo'].append(mem)
+        elif days_ago <= 180:
+            buckets['last_6mo'].append(mem)
+
+    # Log for debugging
+    total = sum(len(v) for v in buckets.values())
+    print(f"[Timeline] {total} memories bucketed: "
+          f"today={len(buckets['today'])} "
+          f"yesterday={len(buckets['yesterday'])} "
+          f"last_week={len(buckets['last_week'])}")
+
+    return buckets
 
 
 @app.post("/hotkey/recall")
@@ -462,6 +633,53 @@ async def storage_clear(
     conn.close()
     return { "status": "cleared",
              "message": "All memories deleted — fresh start" }
+
+
+# ─── Role storage (localStorage + DB + JWT) ───────────────────────────────
+VALID_ROLES = list(ROLE_ALLOWED_ENDPOINTS.keys())
+
+
+@app.post("/role/save")
+async def save_role(request: Request):
+    """Saves role to DB and returns JWT with role embedded for API calls."""
+    data = await request.json()
+    role = data.get("role")
+    if role not in VALID_ROLES:
+        raise HTTPException(status_code=400, detail=f"Unknown role: {role}")
+    conn = _get_conn()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_settings (
+            key TEXT PRIMARY KEY, value TEXT
+        )
+    """)
+    conn.execute(
+        "INSERT OR REPLACE INTO user_settings VALUES (?,?)",
+        ("user_role", role),
+    )
+    conn.commit()
+    conn.close()
+    token = create_access_token({"role": role, "plan": "personal"})
+    logger.info(f"[Role] Saved: {role}")
+    return {"status": "saved", "role": role, "token": token}
+
+
+@app.get("/role/current")
+async def get_current_role():
+    """Returns the currently saved role from DB."""
+    try:
+        conn = _get_conn()
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_settings (
+                key TEXT PRIMARY KEY, value TEXT
+            )
+        """)
+        row = conn.execute(
+            "SELECT value FROM user_settings WHERE key='user_role'"
+        ).fetchone()
+        conn.close()
+        return {"role": row["value"] if row else None}
+    except Exception:
+        return {"role": None}
 
 # ─── Mode API ────────────────────────────────────────────────────────────
 

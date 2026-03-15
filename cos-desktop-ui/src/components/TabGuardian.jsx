@@ -6,7 +6,7 @@ import { useMode } from '../context/ModeContext'
    Instant overlay on every tab switch · bottom-right · z-index 9999.
    ──────────────────────────────────────────────────────────────────────── */
 
-const API = 'http://localhost:8000'
+const API = ''
 
 const TabGuardian = () => {
   const [visible, setVisible] = useState(false)

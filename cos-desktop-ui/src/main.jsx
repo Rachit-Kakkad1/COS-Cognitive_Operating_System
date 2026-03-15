@@ -11,13 +11,13 @@ import { ModeProvider } from './context/ModeContext'
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
-      <ModeProvider>
-        <ThemeProvider>
+      <ThemeProvider>
+        <ModeProvider>
           <FocusProvider>
             <App />
           </FocusProvider>
-        </ThemeProvider>
-      </ModeProvider>
+        </ModeProvider>
+      </ThemeProvider>
     </BrowserRouter>
   </React.StrictMode>,
 )

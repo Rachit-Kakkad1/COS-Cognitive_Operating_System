@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "COS WorkSense — Cognitive Workforce Monitor",
+  "version": "1.0.0",
+  "description": "Ethical workforce intelligence — cognitive patterns only",
+  "permissions": ["activeTab", "tabs", "storage", "scripting", "alarms", "notifications"],
+  "host_permissions": [
+    "http://localhost:8003/*",
+    "http://localhost:5176/*",
+    "<all_urls>"
+  ],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [{
+    "matches": ["http://localhost:5176/*"],
+    "js": ["content.js"],
+    "run_at": "document_idle"
+  }],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "COS WorkSense"
+  }
+}

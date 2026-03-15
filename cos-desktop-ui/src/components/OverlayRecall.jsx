@@ -1,27 +1,40 @@
 import { useState, useEffect } from 'react'
 
-const API = 'http://localhost:8000'
+const API = 'http://localhost:8004'
 
 export default function OverlayRecall() {
   const [recall, setRecall] = useState(null)
   const [visible, setVisible] = useState(false)
+  const [intervention, setIntervention] = useState(null)
 
   useEffect(() => {
-    let lastRecallId  = null
-    let lastSwitchTs  = null
+    let lastIntTs = null
+    let lastRecallId = null
+
+    // WebSocket for real-time interventions
+    const ws = new WebSocket(`ws://${window.location.hostname}:8004/intervention/ws`)
+    ws.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data)
+        if (data.type === 'intervention' && data.timestamp !== lastIntTs) {
+          lastIntTs = data.timestamp
+          setIntervention(data)
+          setVisible(true)
+        }
+      } catch (err) { console.error("WS Error:", err) }
+    }
 
     const interval = setInterval(async () => {
       try {
-        // 1. Context switch check (higher priority)
-        const switchRes  = await fetch(`${API}/switch_status`)
-        const switchData = await switchRes.json()
-        if (switchData.event && switchData.event.timestamp !== lastSwitchTs) {
-          lastSwitchTs = switchData.event.timestamp
-          const prev = switchData.event.from
-          setRecall({ ...prev, type: 'switch', message: `Switched from ${prev.app}. Go back?` })
-          setVisible(true)
-          setTimeout(() => setVisible(false), 8000)
-          return
+        // 1. Intervention Polling (fallback)
+        if (!intervention) {
+          const intRes = await fetch(`${API}/intervention/status`)
+          const intData = await intRes.json()
+          if (intData.active && intData.timestamp !== lastIntTs) {
+            lastIntTs = intData.timestamp
+            setIntervention(intData)
+            setVisible(true)
+          }
         }
 
         // 2. Normal hotkey recall
@@ -30,16 +43,34 @@ export default function OverlayRecall() {
         if (data.result && data.result.memory_id !== lastRecallId) {
           lastRecallId = data.result.memory_id
           setRecall({ ...data.result, type: 'recall' })
+          setIntervention(null) // prioritize recall if triggered
           setVisible(true)
           setTimeout(() => setVisible(false), 8000)
         }
       } catch { /* backend offline */ }
-    }, 3000)
+    }, 2000)
 
-    return () => clearInterval(interval)
-  }, [])
+    return () => {
+      clearInterval(interval)
+      ws.close()
+    }
+  }, [intervention])
 
-  const handleResume = async () => {
+  const handleResponse = async (ans) => {
+    try {
+      await fetch(`${API}/intervention/respond`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ response: ans })
+      })
+      if (ans === 'yes') {
+        await fetch(`${API}/intervention/reopen`, { method: 'POST' })
+      }
+    } catch {}
+    setVisible(false)
+    setIntervention(null)
+  }
+
+  const handleRecallResume = async () => {
     if (recall.url) window.open(recall.url, '_blank')
     else {
       try {
@@ -52,108 +83,132 @@ export default function OverlayRecall() {
     setVisible(false)
   }
 
-  if (!visible || !recall) return null
+  if (!visible || (!recall && !intervention)) return null
 
-  const isSwitch = recall.type === 'switch'
+  const isIntervention = !!intervention
+  const data = intervention || recall
 
   return (
     <div style={{
-      position: 'fixed', bottom: 84, right: 16, zIndex: 1000, maxWidth: 340,
+      position: 'fixed', bottom: 84, right: 16, zIndex: 1000, maxWidth: 360,
       animation: 'slideInRight 0.32s cubic-bezier(0.34,1.56,0.64,1)',
     }}>
       {/* Card */}
       <div style={{
-        background: isSwitch
-          ? 'rgba(4,0,80,0.92)'
-          : 'rgba(2,0,21,0.92)',
-        border: `1px solid ${isSwitch ? 'rgba(119,172,241,0.45)' : 'rgba(62,219,240,0.4)'}`,
-        borderRadius: 20, padding: '18px 20px',
-        backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
-        boxShadow: isSwitch
-          ? '0 16px 48px rgba(119,172,241,0.12), 0 0 0 1px rgba(119,172,241,0.08)'
-          : '0 16px 48px rgba(62,219,240,0.12), 0 0 0 1px rgba(62,219,240,0.06)',
-        display: 'flex', flexDirection: 'column', gap: 12,
+        background: isIntervention
+          ? 'rgba(10, 15, 30, 0.95)'
+          : 'rgba(2, 0, 21, 0.92)',
+        border: `1px solid ${isIntervention ? 'rgba(255, 87, 87, 0.4)' : 'rgba(62, 219, 240, 0.4)'}`,
+        borderRadius: 20, padding: '20px',
+        backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)',
+        boxShadow: isIntervention
+          ? '0 20px 60px rgba(255, 87, 87, 0.15), 0 0 0 1px rgba(255, 87, 87, 0.1)'
+          : '0 16px 48px rgba(62, 219, 240, 0.12), 0 0 0 1px rgba(62, 219, 240, 0.06)',
+        display: 'flex', flexDirection: 'column', gap: 14,
       }}>
 
-        {/* Badge row */}
+        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{
-              fontSize: 18,
-              filter: `drop-shadow(0 0 8px ${isSwitch ? '#77ACF1' : '#3EDBF0'})`,
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 10,
+              background: isIntervention ? 'rgba(255, 87, 87, 0.1)' : 'rgba(62, 219, 240, 0.1)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 18
             }}>
-              {isSwitch ? '⚡' : '🧠'}
-            </span>
-            <span style={{
-              fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
-              color: isSwitch ? '#77ACF1' : '#3EDBF0',
-            }}>
-              {isSwitch ? 'Context Switch' : 'COS Recall'}
-            </span>
+              {isIntervention ? '⚠️' : '🧠'}
+            </div>
+            <div>
+              <div style={{
+                fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase',
+                color: isIntervention ? '#FF5757' : '#3EDBF0',
+              }}>
+                {isIntervention ? 'Drift Intervention' : 'Context Recall'}
+              </div>
+              <div style={{ color: 'rgba(240,235,204,0.5)', fontSize: 10 }}>
+                {isIntervention ? 'Focus Dip Detected' : 'Memory Restored'}
+              </div>
+            </div>
           </div>
           <button
             onClick={() => setVisible(false)}
             style={{
               background: 'none', border: 'none', color: 'rgba(240,235,204,0.25)',
-              cursor: 'pointer', fontSize: 16, padding: 0, lineHeight: 1,
-              transition: 'color 0.15s',
+              cursor: 'pointer', fontSize: 20, lineHeight: 1, padding: 0
             }}
-            onMouseEnter={e => e.currentTarget.style.color = 'rgba(240,235,204,0.6)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'rgba(240,235,204,0.25)'}
           >×</button>
         </div>
 
-        {/* Message */}
-        <p style={{ color: 'var(--cream)', fontSize: 13, fontWeight: 500, lineHeight: 1.5 }}>
-          {isSwitch ? recall.message : recall.summary}
-        </p>
+        {/* Content */}
+        {isIntervention ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <p style={{ color: 'var(--cream)', fontSize: 13, lineHeight: 1.5, margin: 0 }}>
+              You drifted from <b>{intervention.from_app}</b> to <b>{intervention.to_app}</b>.
+              Your focus score was <b>{intervention.focus_score}%</b>.
+            </p>
+            <div style={{ 
+              background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '8px 12px',
+              borderLeft: '3px solid #FF5757', fontSize: 12, color: 'rgba(240,235,204,0.7)'
+            }}>
+              "Would you like to go back?"
+            </div>
+          </div>
+        ) : (
+          <p style={{ color: 'var(--cream)', fontSize: 13, lineHeight: 1.5, margin: 0 }}>
+            {data.summary}
+          </p>
+        )}
 
-        {/* Footer */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ color: 'rgba(240,235,204,0.3)', fontSize: 11 }}>
-            {isSwitch ? recall.title : `${recall.app} · ${recall.timestamp}`}
-          </span>
-          <button
-            onClick={handleResume}
-            style={{
-              background: isSwitch
-                ? 'linear-gradient(135deg,rgba(119,172,241,0.2),rgba(119,172,241,0.1))'
-                : 'linear-gradient(135deg,rgba(62,219,240,0.2),rgba(62,219,240,0.1))',
-              border: `1px solid ${isSwitch ? 'rgba(119,172,241,0.4)' : 'rgba(62,219,240,0.4)'}`,
-              borderRadius: 8, padding: '6px 14px',
-              color: isSwitch ? '#77ACF1' : '#3EDBF0',
-              fontSize: 12, fontWeight: 700, cursor: 'pointer',
-              fontFamily: "'Outfit', sans-serif",
-              transition: 'box-shadow 0.2s',
-            }}
-            onMouseEnter={e => e.currentTarget.style.boxShadow = `0 0 16px ${isSwitch ? 'rgba(119,172,241,0.3)' : 'rgba(62,219,240,0.3)'}`}
-            onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
-          >
-            {isSwitch ? '← Take me back' : (recall.url ? 'Resume →' : 'Dismiss')}
-          </button>
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+          {isIntervention ? (
+            <>
+              <button
+                onClick={() => handleResponse('yes')}
+                style={{
+                  flex: 1, background: '#FF5757', color: 'white', border: 'none',
+                  borderRadius: 10, padding: '10px', fontSize: 13, fontWeight: 700,
+                  cursor: 'pointer', transition: 'transform 0.2s'
+                }}
+              >Yes, Take me back</button>
+              <button
+                onClick={() => handleResponse('no')}
+                style={{
+                  flex: 0.4, background: 'rgba(255,255,255,0.05)', color: 'white',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 10, padding: '10px', fontSize: 13, fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >No</button>
+            </>
+          ) : (
+            <button
+              onClick={handleRecallResume}
+              style={{
+                width: '100%', background: 'linear-gradient(135deg, #3EDBF0, #00A8FF)',
+                color: 'white', border: 'none', borderRadius: 10, padding: '10px',
+                fontSize: 13, fontWeight: 700, cursor: 'pointer'
+              }}
+            >
+              {data.url ? 'Open in Browser' : 'Restore App'}
+            </button>
+          )}
         </div>
 
-        {/* Auto-dismiss progress bar */}
-        <div style={{ height: 2, background: 'rgba(240,235,204,0.06)', borderRadius: 1, overflow: 'hidden' }}>
-          <div style={{
-            height: '100%',
-            background: `linear-gradient(90deg,${isSwitch ? '#77ACF1' : '#3EDBF0'},${isSwitch ? '#77ACF1aa' : '#3EDBF0aa'})`,
-            boxShadow: `0 0 8px ${isSwitch ? 'rgba(119,172,241,0.5)' : 'rgba(62,219,240,0.5)'}`,
-            borderRadius: 1,
-            animation: 'shrink 8s linear forwards',
-          }} />
-        </div>
+        {/* Footer info */}
+        {!isIntervention && (
+          <div style={{ color: 'rgba(240,235,204,0.3)', fontSize: 10, textAlign: 'center' }}>
+            {data.app} · {data.timestamp}
+          </div>
+        )}
       </div>
 
       <style>{`
         @keyframes slideInRight {
-          from { opacity: 0; transform: translateX(32px) scale(0.95); }
-          to   { opacity: 1; transform: translateX(0)   scale(1); }
+          from { opacity: 0; transform: translateX(40px) scale(0.9); }
+          to   { opacity: 1; transform: translateX(0) scale(1); }
         }
-        @keyframes shrink {
-          from { width: 100%; }
-          to   { width: 0%; }
-        }
+        b { color: white; font-weight: 700; }
       `}</style>
     </div>
   )
