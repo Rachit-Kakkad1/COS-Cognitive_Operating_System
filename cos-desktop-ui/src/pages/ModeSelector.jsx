@@ -155,7 +155,7 @@ const ModeCard = ({ label, desc, icon, accent, pills, onSelect }) => {
         style={{ padding: '32px', display: 'flex', flexDirection: 'column', height: '100%' }}
       >
         <div style={{ 
-          width: '56px', height: '56px', borderRadius: R.md, background: C.bgActive, 
+          width: '56px', height: '56px', borderRadius: R.md, 
           display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '32px',
           marginBottom: '24px', border: `1px solid ${C.borderLight}`,
           transition: 'all 0.3s ease',

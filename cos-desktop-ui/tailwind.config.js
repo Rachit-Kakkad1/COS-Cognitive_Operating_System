@@ -8,15 +8,15 @@ export default {
       },
       colors: {
         cos: {
-          bg: '#09090b',
-          card: '#18181b', 
-          border: '#27272a',
-          text: '#f4f4f5',
-          muted: '#a1a1aa',
-          primary: '#6366f1',
-          primaryHover: '#4f46e5',
-          accent: '#14b8a6',
-          accentHover: '#0d9488',
+          bg: '#0B0F19',
+          card: '#111827', 
+          border: '#1E293B',
+          text: '#E5E7EB',
+          muted: '#9CA3AF',
+          primary: '#6366F1',
+          primaryHover: '#4F46E5',
+          accent: '#22C55E',
+          accentHover: '#16A34A',
         }
       }
     },
